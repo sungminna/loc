@@ -12,3 +12,4 @@ data/cache/
 .idea/
 out/
 .bun/
+.playwright-mcp/

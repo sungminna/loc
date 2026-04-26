@@ -42,8 +42,11 @@ if (!user) {
   process.exit(2);
 }
 
+const skipThreads = process.argv.includes("--skip-threads") || env.SKIP_THREADS === "1";
+
 if (igTok) await seedInstagram(igTok, user.id);
-if (thTok) await seedThreads(thTok, user.id);
+if (thTok && !skipThreads) await seedThreads(thTok, user.id);
+else if (thTok && skipThreads) console.log("\n[Threads] skipped (--skip-threads)");
 
 console.log("\n✓ Bootstrap complete.");
 

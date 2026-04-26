@@ -26,11 +26,22 @@ interface LivePlayerProps {
   autoPlay?: boolean;
   /** When true, audio starts muted (avoids browser block + politeness). */
   mutedDefault?: boolean;
+  /**
+   * Frame to render when paused / on first mount. Defaults to a frame past
+   * each composition's entry animation so cards show their full design even
+   * before playback starts. Override per-Player if you want frame 0.
+   */
+  initialFrame?: number;
   /** Extra class on the wrapper. */
   className?: string;
   /** Border radius shorthand. */
   rounded?: string;
 }
+
+// Default landing frame past each composition's entry spring (≈ 1s @ 30fps).
+// Players paused at frame 0 render an empty AbsoluteFill because every
+// slide enters with a spring/opacity 0; landing at 30 shows the design.
+const DEFAULT_INITIAL_FRAME = 30;
 
 export function LivePlayer({
   compositionId,
@@ -40,6 +51,7 @@ export function LivePlayer({
   loop = true,
   autoPlay = true,
   mutedDefault = true,
+  initialFrame,
   className = "",
   rounded = "rounded-2xl",
 }: LivePlayerProps) {
@@ -63,9 +75,15 @@ export function LivePlayer({
   const fullDuration = entry.durationFromProps(merged);
   // Player rejects ≤0 frames. Stills (ThreadsCard) report 1, which is fine.
   const total = Math.max(1, fullDuration);
+  const startFrame = initialFrame ?? Math.min(DEFAULT_INITIAL_FRAME, total - 1);
 
   return (
-    <div className={`${className} ${rounded} overflow-hidden bg-black border border-zinc-800`}>
+    <div
+      className={`${className} ${rounded} overflow-hidden bg-black border border-zinc-800`}
+      // Fill the parent. Without explicit height the wrapper collapses to 0px
+      // and the Player computes 0×0 (audio still mounts, but no visuals).
+      style={{ width: "100%", height: "100%" }}
+    >
       <Player
         component={entry.Component}
         inputProps={merged}
@@ -76,6 +94,7 @@ export function LivePlayer({
         controls={controls}
         loop={loop}
         autoPlay={autoPlay}
+        initialFrame={startFrame}
         // Always mute by default — autoplay with audio is blocked by Chromium
         // anyway, and unsolicited audio in an editor is hostile UX.
         initiallyMuted={mutedDefault}
@@ -87,6 +106,7 @@ export function LivePlayer({
         outFrame={range?.[1]}
         clickToPlay
         spaceKeyToPlayOrPause
+        acknowledgeRemotionLicense
       />
     </div>
   );

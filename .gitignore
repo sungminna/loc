@@ -14,3 +14,6 @@ out/
 .bun/
 .playwright-mcp/
 .claude/scheduled_tasks.lock
+# QA screenshots (Playwright captures during dashboard smoke tests)
+*.png
+!docs/**/*.png

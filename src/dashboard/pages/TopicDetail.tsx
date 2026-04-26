@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import cronstrue from "cronstrue";
 import { trpc } from "../trpc";
@@ -25,8 +25,19 @@ export function TopicDetail() {
   return <TopicDetailInner id={id} />;
 }
 
+const ACTIVE_STATUSES = new Set(["planned", "researching", "planning", "generating", "rendering", "publishing"]);
+
 function TopicDetailInner({ id }: { id: string }) {
-  const detail = trpc.topics.get.useQuery({ id });
+  const detail = trpc.topics.get.useQuery(
+    { id },
+    {
+      refetchInterval: (query) => {
+        const data = query.state.data;
+        if (!data) return false;
+        return data.runs.some((r) => ACTIVE_STATUSES.has(r.status)) ? 5000 : false;
+      },
+    },
+  );
   const navigate = useNavigate();
   const utils = trpc.useUtils();
   const toast = useToast();

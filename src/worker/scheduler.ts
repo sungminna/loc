@@ -87,6 +87,9 @@ export async function consume(
       body: JSON.stringify({ runId }),
     });
     if (!ack.ok) {
+      // Another run for this topic is in flight (status 423). Park this
+      // delivery — when the holder releases, the next attempt acquires
+      // cleanly. 60s is plenty for typical run durations to bracket each other.
       msg.retry({ delaySeconds: 60 });
       continue;
     }
@@ -96,10 +99,23 @@ export async function consume(
       spawnSandboxRun(env, runId, topicId, userId)
         .catch(async (e) => {
           const error = e instanceof Error ? e.message : String(e);
-          await db.update(runs).set({ status: "failed", error: error.slice(0, 4000), finishedAt: new Date() })
-            .where(eq(runs.id, runId));
+          // Defensive: spawnSandboxRun also marks failed on its own paths,
+          // but if it threw before reaching that block (e.g. topic
+          // ownership mismatch), reconcile here.
+          await db.update(runs).set({
+            status: "failed",
+            error: error.slice(0, 4000),
+            finishedAt: new Date(),
+          }).where(eq(runs.id, runId));
+          console.error(`[run ${runId}] spawn threw:`, error);
         })
-        .finally(() => stub.fetch("https://lock/release", { method: "POST" })),
+        .finally(async () => {
+          try {
+            await stub.fetch("https://lock/release", { method: "POST" });
+          } catch (e) {
+            console.error(`[run ${runId}] lock release failed:`, e);
+          }
+        }),
     );
   }
 }

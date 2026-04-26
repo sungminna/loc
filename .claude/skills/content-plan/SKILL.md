@@ -33,6 +33,7 @@ If `template.json` has `kind === "reel-video"` (or `compositionId === "SeedanceR
         "headline": "<≤14 chars Korean / ≤22 chars English. Punchy.>",
         "body": "<≤40 chars supporting line. Optional.>",
         "emphasis": "<single emoji used as stamp on a key slide. Optional.>",
+        "stat": { "value": "73", "suffix": "%", "label": "label" },
         "bgImagePrompt": "<vivid prompt for gpt-image-2, vertical, no text in image>"
       }
     ]
@@ -56,32 +57,106 @@ If `template.json` has `kind === "reel-video"` (or `compositionId === "SeedanceR
 > `body + attribution + hashtags`. If you bake hashtags into `caption.*`,
 > they'll be appended twice and the IG 30-tag limit will trip.
 
-## Composition rules (viral instinct)
+## Retention-first composition (the only thing that matters)
 
-- **Slide 1 = hook**: a curiosity gap, contrast, or shocking number. Not a topic announcement.
-- **Slides 2-4 = payoff**: each slide adds ONE concrete idea. No filler.
-- **Slide 5 = action**: tell the viewer what to do (save, try, share).
-- **Slide 6 (optional) = identity**: a memorable line that ties to the brand.
-- 5-6 slides total. Never more.
-- Headlines should be readable in 1 second. If you need to read it twice, shorten.
-- Korean: 한 줄 14자 이내. 조사 줄이고 명사 위주. 영어: 22 chars.
-- Image prompts: never request text in the image (leave text to the template). Mood: cinematic, editorial, high contrast, modern.
-- Threads body and IG caption should NOT be the same. Threads is conversational; IG caption is curiosity + concrete payoff hint.
+The 2026 Reels algorithm ranks on **watch time + likes-per-reach + sends-per-reach**. Half of viewers drop in the first 3 seconds. Plan against that explicitly.
+
+### Slide 1 = the 3-second hook
+Slide 1 must do exactly ONE of these — never a category title:
+
+- **Curiosity gap**: "내가 ___ 한 진짜 이유" / "1년 동안 매일 이걸 했더니"
+- **Contrarian claim**: "이건 다 거짓말이에요" / "프로들이 안 알려주는 ___"
+- **Concrete number that contradicts intuition**: "하루 7분으로 충분한 이유" / "수입의 50%를 ___ 에 쓰는 사람들"
+- **Direct address with stake**: "당신이 지금 이 순간 ___ 하고 있다면 멈추세요"
+- **Shocking visual cue described in the bgImagePrompt**: a single weird/striking object, person mid-motion, color-blocked composition.
+
+What slide 1 must NOT be:
+- "오늘의 키워드 ___" (announces topic, kills curiosity)
+- "안녕하세요 여러분" (greeting = scroll)
+- A summary of the next 4 slides
+- The conclusion stated up front
+
+### Slide 2-4 = payoff (one idea each)
+- Each slide adds **exactly one** concrete, take-away-able idea.
+- If the headline doesn't fit on one line at native font size, it's too long.
+- Use stat slides where the data is genuinely surprising. Don't invent numbers; cite them from research.md only when they are real.
+- Don't repeat slide 1's hook in slide 2 — the viewer already paid attention; reward them with new info.
+
+### Slide 5 = action
+- Tell the viewer what to physically do this week. Not "remember this" — that's not actionable.
+- Good: "오늘 자기 전 10분만 시도해보기" / "내일 아침 첫 1시간 Save this"
+- Bad: "감사합니다" / "도움이 됐길 바라요"
+
+### Slide 6 (optional) = identity / save prompt
+- Memorable line tied to the persona, OR an explicit "🔖 저장하고 다시 보기" with `emphasis: "🔖"`.
+- Skipping slide 6 is fine for ≤6s content.
+
+### Headlines (KO ≤14, EN ≤22 chars)
+- 한국어: 조사 줄이고 명사 위주. 동사는 받침 없는 짧은 형. "나는 매일 ___" 보다 "매일 ___".
+- English: drop articles. Use sentence-fragment style: "Three rules I broke", not "These are the three rules I broke".
+- Readable in ≤1 second of muted scroll.
+
+### Image prompts (sound-off design)
+- ~50% of Reels are watched muted — the visual must carry the meaning.
+- Single focal subject, high contrast against background, deliberate negative space (text overlays sit there).
+- Cinematic vocabulary: "50mm lens, soft daylight, shallow depth of field, editorial composition".
+- NEVER request text inside the image — typography is the template's job. The composition will overprint kicker + headline + body.
+- Avoid: stock-photo greys, generic office desk shots, AI clichés (perfect rooms, glowing orbs, robotic hands), clichéd "AI on phone screen" mockups.
+- The `imageStylePrompt` on the topic + `bgPromptTemplate` on the template are concatenated automatically. Your `bgImagePrompt` is the *content* layer.
+
+## Threads composition
+
+Threads is conversational. The format that wins in 2026 is **Hook → Context → Position → Invitation**:
+
+```
+<hook line — strong claim or curiosity gap, ends with newline>
+
+<context: one sentence with the why>
+
+<position: 1-2 sentences with your take>
+
+<invitation: a question the reader can reply to OR a single emoji-tagged line that nudges sharing>
+```
+
+Practical rules:
+- Use line breaks. Walls of text die on Threads.
+- Body ≤280 chars (leaves ≥200 chars for the music attribution + ≤5 hashtags within the 500-char post limit).
+- IG and Threads bodies must NOT be identical. IG caption hints at the payoff and rewards a tap-into-comments. Threads gives a take + a question.
+- Don't include URLs in the IG caption (IG penalizes self-referential links). Threads is fine for one short URL when it's contextual, but not the brand homepage.
 
 ## Caption rules
 
 - IG caption body: ≤ 1,800 chars (we reserve ~400 for hashtags + attribution; total Meta limit is 2,200).
-- Threads body: ≤ 280 chars (leaves room for attribution + ≤5 hashtags within the 500-char total).
-- DO NOT include URLs in IG captions — they aren't clickable and IG penalizes self-referential links.
+- Threads body: ≤ 280 chars.
+- IG caption opens with a 1-line hook that mirrors slide 1's curiosity gap, then 1-2 lines of payoff, then a single CTA. No hashtags inside; the publisher appends them.
+- Avoid cliché openers: "오늘은", "여러분 안녕하세요", "이 영상에서는". They're algorithmic noise.
 
 ## Hashtag rules
 
 - Output 5-10 tags in `hashtags`. No `#` prefix. No spaces. ASCII or unicode allowed (Korean OK).
-- Mix: one big-volume (e.g. `shorts`, `reels`, `viral`), 3-5 mid-volume topical, 1-2 niche.
-- Korean topics: include both Korean and Romanized variants when natural.
-- `threadsTopicTag`: pick the single most-relevant indexed topic. This becomes Threads' `topic_tag` API param (one per post).
+- Mix: one large-volume (`reels`, `viral`, `shorts`), 3-5 mid-volume topical, 1-2 niche.
+- Korean topics: include both Korean and Romanized variants when natural ("브랜딩" + "branding").
+- `threadsTopicTag`: pick the single most-relevant indexed topic. This becomes Threads' `topic_tag` API param (one per post). No `#`, no spaces in the tag itself.
 - If `topic.hashtagMode === "fixed"`: still emit `hashtags` (the publisher will ignore yours and use `topic.fixedHashtags`).
 - If `topic.hashtagMode === "mixed"`: emit your own; publisher will merge with `fixedHashtags` and dedupe.
+
+## Originality
+
+Instagram's 2026 ranking penalizes recycled content. Don't:
+- Use stock viral phrasing verbatim ("Wait for it...", "POV:", "Tell me without telling me…").
+- Reuse a hook from a previous run on this topic — diversify across runs.
+- Produce a slide deck that's just a list of "5 tips for X". Stories beat lists. Pick a single concrete experience.
+
+## Self-critique loop (mandatory)
+
+After your first draft, check yourself:
+1. Read slide 1's headline aloud. Would *you* swipe down within 1 second of seeing it muted? If yes, rewrite.
+2. Is slide 5 actionable in the next 24 hours? If not, rewrite.
+3. Does each slide deliver new info, or is slide 3 a reheated slide 2?
+4. Threads: is the first line a punchline that stands alone? If it depends on the body, hoist it.
+5. Are any numbers fabricated? Cross-check against research.md. If it's not in there, drop it.
+
+You may revise once before writing the brief.
 
 ## Image-prompt rules (interplay with imageMode)
 
@@ -89,14 +164,15 @@ If `template.json` has `kind === "reel-video"` (or `compositionId === "SeedanceR
   - `ai-all` → all slides + Threads bg.
   - `ai-first-only` → slide 0 + Threads bg.
   - `template-only` → no AI generation; the template's static bg or gradient is used. Your prompts are still useful for re-rolls in the dashboard.
-- Prefix every prompt with `topic.imageStylePrompt` and (when present) `template.bgPromptTemplate`. The orchestrator handles concatenation; just write the *content* prompt focused on the slide's idea.
+- The orchestrator concatenates `topic.imageStylePrompt + template.bgPromptTemplate + your bgImagePrompt`. Just write the *content* prompt focused on the slide's idea — never re-paste the style prefix.
 
 ## Steps
 
 1. Read topic.json (and template.json if present) and research.md.
 2. Apply persona prompt (`topic.personaPrompt`) as a tone overlay.
-3. Draft and self-critique once: would *you* stop scrolling at slide 1?
-4. Write `data/runs/$LOC_RUN_ID/brief.json` and stdout the path.
+3. Draft the brief with the rules above.
+4. Run the self-critique loop. Revise once if needed.
+5. Write `data/runs/$LOC_RUN_ID/brief.json` and stdout the path.
 
 ## Constraints
 

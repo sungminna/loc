@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import cronstrue from "cronstrue";
 import { trpc } from "../trpc";
@@ -45,12 +45,31 @@ const DEFAULT: TopicForm = {
   fixedHashtags: [],
 };
 
+// Statuses that mean a sandbox is currently running for the topic. Drives
+// the "running now" pill + the auto-refresh interval.
+const ACTIVE_STATUSES = new Set(["planned", "researching", "planning", "generating", "rendering", "publishing"]);
+
 export function Topics() {
   const list = trpc.topics.list.useQuery();
   const accounts = trpc.accounts.list.useQuery();
   const templates = trpc.templates.list.useQuery();
+  // Refetch recent runs every 5s so the running-now badge stays current
+  // without an in-page subscription. Bounded `limit: 50` keeps it cheap.
+  const recentRuns = trpc.runs.list.useQuery(
+    { limit: 50 },
+    { refetchInterval: 5000 },
+  );
   const utils = trpc.useUtils();
   const toast = useToast();
+
+  const activeByTopic = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const r of recentRuns.data ?? []) {
+      if (!ACTIVE_STATUSES.has(r.status)) continue;
+      if (!m.has(r.topicId)) m.set(r.topicId, r.status);
+    }
+    return m;
+  }, [recentRuns.data]);
 
   const create = trpc.topics.create.useMutation({
     onSuccess: () => { utils.topics.list.invalidate(); toast({ tone: "ok", msg: "토픽 추가됨" }); },
@@ -95,26 +114,40 @@ export function Topics() {
         )
         : (
           <div className="space-y-3">
-            {list.data?.map((t) => (
+            {list.data?.map((t) => {
+              const activeStatus = activeByTopic.get(t.id);
+              return (
               <div key={t.id} className="card flex items-center justify-between">
                 <Link to={`/topics/${t.id}`} className="flex-1 min-w-0 group">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className={`w-1.5 h-1.5 rounded-full ${t.enabled ? "bg-emerald-400" : "bg-zinc-600"}`} />
                     <span className="font-medium group-hover:text-yellow-300 transition">{t.name}</span>
                     <span className="text-zinc-500 text-xs uppercase">{t.lang}</span>
+                    {activeStatus ? (
+                      <span className="px-2 py-0.5 rounded-full text-xs bg-yellow-500/15 text-yellow-300 border border-yellow-500/30">
+                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-yellow-300 animate-pulse mr-1.5 align-middle" />
+                        {activeStatus} 중
+                      </span>
+                    ) : null}
+                    {t.useDraftForNext ? (
+                      <span className="px-2 py-0.5 rounded-full text-xs bg-blue-500/15 text-blue-300 border border-blue-500/30">초안 사용</span>
+                    ) : null}
                   </div>
-                  <div className="text-zinc-500 text-xs mt-1">{safeCron(t.cron)}</div>
+                  <div className="text-zinc-500 text-xs mt-1">{safeCron(t.cron)} · 다음 {fmtNextRun(t.nextRunAt, t.enabled)}</div>
                   <div className="text-zinc-500 text-xs">소스 {t.sourceUrls.length} · 템플릿 {t.templateSlugs.join(",") || "—"} · 일일 {t.dailyRunCap}회 · ${t.costCapUsd} 상한</div>
                 </Link>
                 <div className="flex gap-2 shrink-0 ml-4">
-                  <button className="btn btn-ghost" onClick={() => runNow.mutate({ id: t.id })} disabled={runNow.isPending}>지금 실행</button>
+                  <button className="btn btn-ghost" disabled={runNow.isPending || !!activeStatus} onClick={() => runNow.mutate({ id: t.id })}>
+                    {activeStatus ? "실행 중" : "지금 실행"}
+                  </button>
                   <button className="btn btn-ghost" onClick={() => setEditing({ id: t.id, form: toForm(t) })}>편집</button>
                   <button className="btn btn-danger" onClick={() => {
                     if (confirm(`"${t.name}" 토픽을 삭제할까요? 관련 실행 이력도 모두 삭제됩니다.`)) remove.mutate({ id: t.id });
                   }}>삭제</button>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -277,6 +310,18 @@ function TopicEditor({ form, setForm, accounts, templates }: {
 
 function safeCron(s: string): string {
   try { return cronstrue.toString(s, { locale: "ko" }); } catch { return "유효하지 않은 cron"; }
+}
+
+function fmtNextRun(d: Date | null | undefined, enabled: boolean): string {
+  if (!enabled) return "비활성";
+  if (!d) return "곧";
+  const ms = d.getTime() - Date.now();
+  if (ms <= 0) return "큐 대기";
+  const min = Math.round(ms / 60000);
+  if (min < 60) return `${min}분 뒤`;
+  const hours = Math.floor(min / 60);
+  if (hours < 24) return `${hours}시간 뒤`;
+  return d.toLocaleString("ko-KR");
 }
 function cronError(s: string): string | undefined {
   try { cronstrue.toString(s); return undefined; } catch { return "잘못된 cron 표현식"; }

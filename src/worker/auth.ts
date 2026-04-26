@@ -40,10 +40,12 @@ export async function authenticate(req: Request, env: Env): Promise<AuthCtx | nu
     return { user, db, env };
   }
 
-  // 3. As a last-resort during local Wrangler dev (no CF Access, no var),
-  // allow a built-in dev user IFF the worker hostname looks local.
+  // 3. As a last-resort during local Wrangler dev only.
+  // CRITICAL: do NOT include `*.workers.dev` here — that hostname IS the
+  // production worker URL, and treating it as "local" hands the dashboard
+  // (with owner role) to anyone on the internet. Loopback only.
   const url = new URL(req.url);
-  if (url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname.endsWith(".workers.dev")) {
+  if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
     const user = await ensureUser(db, DEV_FALLBACK_EMAIL, "owner");
     return { user, db, env };
   }

@@ -449,13 +449,36 @@ export const appRouter = t.router({
   }),
 
   posts: t.router({
-    list: proc.input(z.object({ limit: z.number().min(1).max(200).default(50) }))
-      .query(async ({ ctx, input }) =>
-        ctx.db.query.posts.findMany({
-          where: eq(posts.userId, ctx.user.id),
-          orderBy: [desc(posts.createdAt)],
-          limit: input.limit,
-        })),
+    list: proc.input(z.object({
+      limit: z.number().min(1).max(200).default(50),
+      platform: z.enum(["instagram", "threads"]).optional(),
+      status: z.enum(["pending", "published", "failed"]).optional(),
+    })).query(async ({ ctx, input }) => {
+      const filters = [eq(posts.userId, ctx.user.id)];
+      if (input.platform) filters.push(eq(posts.platform, input.platform));
+      if (input.status) filters.push(eq(posts.status, input.status));
+      const rows = await ctx.db.query.posts.findMany({
+        where: and(...filters),
+        orderBy: [desc(posts.createdAt)],
+        limit: input.limit,
+      });
+      // Join topic name via runs.topicId so the dashboard can group + label.
+      const runIds = Array.from(new Set(rows.map((r) => r.runId)));
+      const runRows = runIds.length
+        ? await ctx.db.query.runs.findMany({ where: inArray(runs.id, runIds) })
+        : [];
+      const topicIds = Array.from(new Set(runRows.map((r) => r.topicId)));
+      const topicRows = topicIds.length
+        ? await ctx.db.query.topics.findMany({ where: inArray(topics.id, topicIds) })
+        : [];
+      const topicByRun = new Map(runRows.map((r) => [r.id, r.topicId]));
+      const nameByTopic = new Map(topicRows.map((t) => [t.id, t.name]));
+      return rows.map((p) => ({
+        ...p,
+        topicId: topicByRun.get(p.runId) ?? null,
+        topicName: nameByTopic.get(topicByRun.get(p.runId) ?? "") ?? null,
+      }));
+    }),
   }),
 
   runs: t.router({

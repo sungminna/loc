@@ -1,3 +1,9 @@
+// Instagram Login (Instagram Business with Instagram Login) OAuth flow.
+// Modern path — does NOT require a Facebook Page. Tokens are issued by
+// Instagram directly and used against graph.instagram.com.
+//
+// Docs: https://developers.facebook.com/docs/instagram-platform/instagram-graph-api/getting-started
+
 import { eq } from "drizzle-orm";
 import { createId } from "@paralleldrive/cuid2";
 import { getDb } from "@db/client";
@@ -6,7 +12,19 @@ import type { Env } from "@shared/env";
 import { encryptToken } from "../crypto";
 import { authenticate } from "../auth";
 
-const SCOPE = ["instagram_business_basic", "instagram_business_content_publish", "pages_show_list"].join(",");
+const SCOPE = [
+  "instagram_business_basic",
+  "instagram_business_content_publish",
+  "instagram_business_manage_comments",
+  "instagram_business_manage_insights",
+].join(",");
+
+function igAppCreds(env: Env): { id: string; secret: string } {
+  // Falls back to Meta app credentials when Instagram-specific ones aren't set
+  const id = (env as unknown as { IG_APP_ID?: string }).IG_APP_ID ?? env.META_APP_ID;
+  const secret = (env as unknown as { IG_APP_SECRET?: string }).IG_APP_SECRET ?? env.META_APP_SECRET;
+  return { id, secret };
+}
 
 export async function igStart(req: Request, env: Env): Promise<Response> {
   const ctx = await authenticate(req, env);
@@ -26,8 +44,9 @@ export async function igStart(req: Request, env: Env): Promise<Response> {
     expiresAt: new Date(Date.now() + 10 * 60 * 1000),
   });
 
-  const auth = new URL("https://www.facebook.com/v25.0/dialog/oauth");
-  auth.searchParams.set("client_id", env.META_APP_ID);
+  const { id } = igAppCreds(env);
+  const auth = new URL("https://www.instagram.com/oauth/authorize");
+  auth.searchParams.set("client_id", id);
   auth.searchParams.set("redirect_uri", redirectUri);
   auth.searchParams.set("scope", SCOPE);
   auth.searchParams.set("state", state);
@@ -39,75 +58,75 @@ export async function igCallback(req: Request, env: Env): Promise<Response> {
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
-  if (!code || !state) return new Response("missing code/state", { status: 400 });
+  if (!code || !state) return errorPage("missing code/state");
 
   const db = getDb(env.DB);
   const row = await db.query.oauthStates.findFirst({ where: eq(oauthStates.state, state) });
   if (!row || row.platform !== "instagram" || row.expiresAt < new Date()) {
-    return new Response("invalid state", { status: 400 });
+    return errorPage("invalid state");
   }
   await db.delete(oauthStates).where(eq(oauthStates.state, state));
 
   try {
-    const tokenResp = await fetchJson(
-      `https://graph.facebook.com/v25.0/oauth/access_token?client_id=${env.META_APP_ID}` +
-        `&client_secret=${env.META_APP_SECRET}` +
-        `&redirect_uri=${encodeURIComponent(row.redirectUri)}&code=${code}`,
-    ) as { access_token: string };
+    const { id, secret } = igAppCreds(env);
 
-    const longLived = await fetchJson(
-      `https://graph.facebook.com/v25.0/oauth/access_token?grant_type=fb_exchange_token` +
-        `&client_id=${env.META_APP_ID}&client_secret=${env.META_APP_SECRET}` +
-        `&fb_exchange_token=${tokenResp.access_token}`,
-    ) as { access_token: string; expires_in?: number };
+    // Step 1: short-lived token via api.instagram.com
+    const tokenForm = new URLSearchParams({
+      client_id: id,
+      client_secret: secret,
+      grant_type: "authorization_code",
+      redirect_uri: row.redirectUri,
+      code,
+    });
+    const shortRes = await fetch("https://api.instagram.com/oauth/access_token", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: tokenForm,
+    });
+    const shortText = await shortRes.text();
+    if (!shortRes.ok) throw new Error(`short token: ${shortRes.status} ${shortText.slice(0, 300)}`);
+    const shortToken = JSON.parse(shortText) as { access_token: string; user_id: number | string };
 
-    const pages = await fetchJson(
-      `https://graph.facebook.com/v25.0/me/accounts?fields=id,name,instagram_business_account&access_token=${longLived.access_token}`,
-    ) as { data: Array<{ id: string; name: string; instagram_business_account?: { id: string } }> };
+    // Step 2: exchange for long-lived (60d) via graph.instagram.com
+    const llRes = await fetch(
+      `https://graph.instagram.com/access_token?grant_type=ig_exchange_token` +
+        `&client_secret=${secret}&access_token=${shortToken.access_token}`,
+    );
+    const llText = await llRes.text();
+    if (!llRes.ok) throw new Error(`long-lived: ${llRes.status} ${llText.slice(0, 300)}`);
+    const longLived = JSON.parse(llText) as { access_token: string; expires_in: number };
 
-    const candidates = pages.data.filter((p) => p.instagram_business_account?.id);
-    if (candidates.length === 0) {
-      return errorPage("Instagram Business 계정이 연결된 Facebook Page가 없습니다. Meta Business Suite에서 연결 후 다시 시도하세요.");
-    }
-    const page = candidates[0]!;
-    const igUserId = page.instagram_business_account!.id;
-
-    const profile = await fetchJson(
-      `https://graph.facebook.com/v25.0/${igUserId}?fields=username&access_token=${longLived.access_token}`,
-    ) as { username: string };
+    // Step 3: profile lookup
+    const profileRes = await fetch(
+      `https://graph.instagram.com/v23.0/me?fields=id,username&access_token=${longLived.access_token}`,
+    );
+    const profileText = await profileRes.text();
+    if (!profileRes.ok) throw new Error(`profile: ${profileRes.status} ${profileText.slice(0, 300)}`);
+    const profile = JSON.parse(profileText) as { id: string; username: string };
 
     const accountId = createId();
     const tokenKvKey = `ig/${accountId}/access_token`;
     const encrypted = await encryptToken(longLived.access_token, env.LOC_MASTER_KEY);
     await env.TOKENS.put(tokenKvKey, encrypted);
 
-    const expiresAt = new Date(Date.now() + (longLived.expires_in ?? 60 * 24 * 3600) * 1000);
-
     await db.insert(accounts).values({
       id: accountId,
       userId: row.userId,
       platform: "instagram",
       handle: profile.username,
-      igUserId,
+      igUserId: profile.id,
       tokenKvKey,
-      tokenExpiresAt: expiresAt,
+      tokenExpiresAt: new Date(Date.now() + longLived.expires_in * 1000),
       refreshedAt: new Date(),
       enabled: true,
-      meta: { pageId: page.id, candidatePages: candidates.length },
+      meta: { flow: "instagram-login" },
     });
 
-    return successPage(`Instagram @${profile.username} 연결 완료${candidates.length > 1 ? ` (${candidates.length}개 페이지 중 첫 번째 선택)` : ""}`);
+    return successPage(`Instagram @${profile.username} 연결 완료 (60일 토큰)`);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    return errorPage(`OAuth 실패: ${msg.slice(0, 200)}`);
+    return errorPage(`OAuth 실패: ${msg.slice(0, 300)}`);
   }
-}
-
-async function fetchJson(url: string): Promise<unknown> {
-  const r = await fetch(url, { method: url.includes("oauth/access_token") ? "POST" : "GET" });
-  const text = await r.text();
-  if (!r.ok) throw new Error(`Meta ${r.status}: ${text.slice(0, 300)}`);
-  return JSON.parse(text);
 }
 
 function successPage(msg: string): Response {

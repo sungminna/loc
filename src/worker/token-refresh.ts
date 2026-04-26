@@ -33,11 +33,11 @@ export async function refreshExpiringTokens(env: Env): Promise<void> {
       let newExpires = Date.now() + RENEWED_VALIDITY_MS;
 
       if (acc.platform === "instagram") {
-        // Long-lived → long-lived exchange (only works while still valid)
+        // Instagram Login: ig_refresh_token (extends 60d, callable any time
+        // after token has been valid ≥24h)
         const r = await fetch(
-          `https://graph.facebook.com/v25.0/oauth/access_token?grant_type=fb_exchange_token` +
-            `&client_id=${env.META_APP_ID}&client_secret=${env.META_APP_SECRET}` +
-            `&fb_exchange_token=${current}`,
+          `https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token` +
+            `&access_token=${current}`,
         );
         if (!r.ok) {
           console.error(`refresh ig ${acc.id}: ${r.status} ${await r.text()}`);

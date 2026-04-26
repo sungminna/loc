@@ -48,6 +48,9 @@ export async function spawnSandboxRun(
   }
 
   const childEnv: Record<string, string> = {
+    // Tells Claude CLI we're already in a sandbox; bypasses the
+    // "no --dangerously-skip-permissions as root" safety check.
+    IS_SANDBOX: "1",
     CLAUDE_CODE_OAUTH_TOKEN: env.CLAUDE_CODE_OAUTH_TOKEN,
     LOC_RUN_ID: runId,
     LOC_TOPIC_ID: topicId,
@@ -63,7 +66,8 @@ export async function spawnSandboxRun(
   const prompt = `Run the orchestrate-run skill for runId=${runId} topicId=${topicId} userId=${userId}. Follow the skill exactly. Halt and report any error to stderr.`;
 
   const result = await sandbox.exec(
-    `cd /workspace && claude -p ${JSON.stringify(prompt)} --output-format stream-json --permission-mode acceptEdits`,
+    // bypassPermissions = full autonomy. IS_SANDBOX=1 bypasses CLI's root check.
+    `cd /workspace && claude -p ${JSON.stringify(prompt)} --output-format stream-json --verbose --dangerously-skip-permissions`,
     { env: childEnv, timeout: 15 * 60 * 1000 },
   );
 

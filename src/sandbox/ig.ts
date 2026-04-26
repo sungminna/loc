@@ -14,7 +14,7 @@
 import { api } from "./lib/api";
 import { publicUrl } from "./upload";
 
-const GRAPH = "https://graph.instagram.com/v25.0";
+const GRAPH = "https://graph.instagram.com/v23.0";
 
 interface Args {
   runId: string;

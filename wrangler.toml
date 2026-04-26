@@ -69,7 +69,7 @@ dataset = "loc_runs"
 # ── Public-facing vars (non-secret) ──────────────────────────────────
 [vars]
 PUBLIC_WORKER_URL = "https://loc-orchestrator.sungminna.workers.dev"
-R2_PUBLIC_BASE = "https://pub-58ac033495a580c4828e361f97892d60.r2.dev"
+R2_PUBLIC_BASE = "https://pub-bc7ed8dc3a384a9ab50857d640a5b24b.r2.dev"
 GEMINI_MODEL = "gemini-2.5-flash-image"
 AI_GATEWAY_BASE = ""
 

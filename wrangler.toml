@@ -11,7 +11,7 @@ crons = ["* * * * *"]
 [[d1_databases]]
 binding = "DB"
 database_name = "loc-app"
-database_id = "REPLACE_WITH_D1_ID"
+database_id = "a599d6c4-7bad-41cb-b494-06e37f2a3ec9"
 migrations_dir = "src/db/migrations"
 
 # ── R2 (object storage) ──────────────────────────────────────────────
@@ -22,11 +22,11 @@ bucket_name = "loc-media"
 # ── KV (token vault + cache) ─────────────────────────────────────────
 [[kv_namespaces]]
 binding = "TOKENS"
-id = "REPLACE_WITH_KV_TOKENS_ID"
+id = "38fc7a0223fa43cfb453be07795a3f8a"
 
 [[kv_namespaces]]
 binding = "CACHE"
-id = "REPLACE_WITH_KV_CACHE_ID"
+id = "76bf3b4d544c4ad4a86ee86e8dbcfcf0"
 
 # ── Queues ───────────────────────────────────────────────────────────
 [[queues.producers]]
@@ -70,7 +70,7 @@ dataset = "loc_runs"
 [vars]
 PUBLIC_WORKER_URL = "http://localhost:8787"
 R2_PUBLIC_BASE = "https://media.example.com"
-R2_ENDPOINT = "https://REPLACE_ACCOUNT.r2.cloudflarestorage.com"
+R2_ENDPOINT = "https://58ac033495a580c4828e361f97892d60.r2.cloudflarestorage.com"
 R2_BUCKET = "loc-media"
 GEMINI_MODEL = "gemini-2.5-flash-image"
 AI_GATEWAY_BASE = ""

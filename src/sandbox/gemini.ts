@@ -48,10 +48,16 @@ async function generate(args: Args): Promise<void> {
   if (!args.prompt) throw new Error("--prompt required");
   if (!args.runId) throw new Error("--run-id required");
 
+  if (!process.env.GEMINI_API_KEY) {
+    // Soft-fail: orchestrate-run treats this as "skip background image"
+    console.error("GEMINI_API_KEY not set — skipping image generation");
+    process.exit(0);
+  }
+
   mkdirSync(args.outDir, { recursive: true });
 
   const ai = new GoogleGenAI({
-    apiKey: process.env.GEMINI_API_KEY!,
+    apiKey: process.env.GEMINI_API_KEY,
     httpOptions: process.env.AI_GATEWAY_BASE
       ? { baseUrl: `${process.env.AI_GATEWAY_BASE}/google-ai-studio` }
       : undefined,

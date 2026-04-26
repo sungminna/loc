@@ -4,8 +4,13 @@ import { getDb } from "@db/client";
 import { topics, runs, users } from "@db/schema";
 import type { Env, RunMessage } from "@shared/env";
 import { spawnSandboxRun } from "./sandbox-spawner";
+import { refreshExpiringTokens } from "./token-refresh";
 
 export async function dispatch(env: Env): Promise<void> {
+  // Token refresh runs every cron tick; the function itself filters by
+  // expiry-window so it's effectively cheap (read-only most of the time).
+  await refreshExpiringTokens(env).catch((e) => console.error("token refresh:", e));
+
   const db = getDb(env.DB);
   const now = new Date();
   const due = await db.query.topics.findMany({

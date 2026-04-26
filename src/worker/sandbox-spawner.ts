@@ -30,8 +30,22 @@ export async function spawnSandboxRun(
   const sandbox = getSandbox(env.Sandbox, sandboxKey);
 
   const repoUrl = env.GITHUB_REPO_URL;
-  await sandbox.exec(`rm -rf /workspace && git clone --depth 1 ${repoUrl} /workspace`);
-  await sandbox.exec("cd /workspace && bun install --frozen-lockfile");
+  if (!repoUrl) throw new Error("GITHUB_REPO_URL secret is empty");
+
+  const cloneRes = await sandbox.exec(
+    // cd / first: sandbox starts in /workspace and we'd be deleting our own cwd
+    `cd / && rm -rf /workspace && git clone --depth 1 ${repoUrl} /workspace`,
+  );
+  console.log(`git clone exit=${cloneRes.exitCode} stdout=${cloneRes.stdout?.slice(0, 200)} stderr=${cloneRes.stderr?.slice(0, 500)}`);
+  if (cloneRes.exitCode !== 0) {
+    throw new Error(`git clone failed (${cloneRes.exitCode}): ${(cloneRes.stderr || cloneRes.stdout || "").slice(0, 1000)}`);
+  }
+
+  const installRes = await sandbox.exec("cd /workspace && bun install --frozen-lockfile");
+  console.log(`bun install exit=${installRes.exitCode} stderr=${installRes.stderr?.slice(0, 300)}`);
+  if (installRes.exitCode !== 0) {
+    throw new Error(`bun install failed (${installRes.exitCode}): ${(installRes.stderr || "").slice(0, 1000)}`);
+  }
 
   const childEnv: Record<string, string> = {
     CLAUDE_CODE_OAUTH_TOKEN: env.CLAUDE_CODE_OAUTH_TOKEN,
@@ -49,7 +63,7 @@ export async function spawnSandboxRun(
   const prompt = `Run the orchestrate-run skill for runId=${runId} topicId=${topicId} userId=${userId}. Follow the skill exactly. Halt and report any error to stderr.`;
 
   const result = await sandbox.exec(
-    `cd /workspace && claude -p ${JSON.stringify(prompt)} --output-format stream-json --permission-mode bypassPermissions`,
+    `cd /workspace && claude -p ${JSON.stringify(prompt)} --output-format stream-json --permission-mode acceptEdits`,
     { env: childEnv, timeout: 15 * 60 * 1000 },
   );
 

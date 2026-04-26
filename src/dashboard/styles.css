@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+  body {
+    font-feature-settings: "ss01" on, "cv11" on;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-zinc-900/60 border border-zinc-800 rounded-2xl p-6 backdrop-blur;
+  }
+  .btn {
+    @apply px-3 py-2 rounded-lg text-sm font-medium transition;
+  }
+  .btn-primary {
+    @apply bg-yellow-300 text-zinc-950 hover:bg-yellow-200;
+  }
+  .btn-ghost {
+    @apply text-zinc-300 hover:text-white hover:bg-zinc-800;
+  }
+  .btn-danger {
+    @apply text-red-300 hover:text-white hover:bg-red-500/30;
+  }
+  .input {
+    @apply bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm w-full focus:border-yellow-300 focus:outline-none;
+  }
+  .label {
+    @apply text-xs uppercase tracking-wider text-zinc-400 mb-1;
+  }
+}

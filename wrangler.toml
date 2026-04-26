@@ -1,0 +1,89 @@
+name = "loc-orchestrator"
+main = "src/worker/index.ts"
+compatibility_date = "2026-04-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Cron Triggers — fires every minute, dispatcher picks due topics
+[triggers]
+crons = ["* * * * *"]
+
+# ── D1 (SQLite) ──────────────────────────────────────────────────────
+[[d1_databases]]
+binding = "DB"
+database_name = "loc-app"
+database_id = "REPLACE_WITH_D1_ID"
+migrations_dir = "src/db/migrations"
+
+# ── R2 (object storage) ──────────────────────────────────────────────
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "loc-media"
+
+# ── KV (token vault + cache) ─────────────────────────────────────────
+[[kv_namespaces]]
+binding = "TOKENS"
+id = "REPLACE_WITH_KV_TOKENS_ID"
+
+[[kv_namespaces]]
+binding = "CACHE"
+id = "REPLACE_WITH_KV_CACHE_ID"
+
+# ── Queues ───────────────────────────────────────────────────────────
+[[queues.producers]]
+queue = "loc-runs"
+binding = "RUNS_QUEUE"
+
+[[queues.consumers]]
+queue = "loc-runs"
+max_batch_size = 5
+max_concurrency = 3
+max_retries = 2
+dead_letter_queue = "loc-runs-dlq"
+
+# ── Durable Objects ──────────────────────────────────────────────────
+[[durable_objects.bindings]]
+name = "TOPIC_RUNNER"
+class_name = "TopicRunner"
+
+[[durable_objects.bindings]]
+name = "Sandbox"
+class_name = "Sandbox"
+
+# ── Containers (Sandbox runs inside this) ────────────────────────────
+[[containers]]
+class_name = "Sandbox"
+image = "./Dockerfile"
+instance_type = "standard-1"
+max_instances = 5
+
+# ── DO migrations ────────────────────────────────────────────────────
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["TopicRunner", "Sandbox"]
+
+# ── Analytics Engine ─────────────────────────────────────────────────
+[[analytics_engine_datasets]]
+binding = "ANALYTICS"
+dataset = "loc_runs"
+
+# ── Public-facing vars (non-secret) ──────────────────────────────────
+[vars]
+PUBLIC_WORKER_URL = "http://localhost:8787"
+R2_PUBLIC_BASE = "https://media.example.com"
+R2_ENDPOINT = "https://REPLACE_ACCOUNT.r2.cloudflarestorage.com"
+R2_BUCKET = "loc-media"
+GEMINI_MODEL = "gemini-2.5-flash-image"
+AI_GATEWAY_BASE = ""
+
+# ── Secrets (set via `wrangler secret put` for production;
+#    .dev.vars for local dev) ────────────────────────────────────────
+# CLAUDE_CODE_OAUTH_TOKEN, LOC_MASTER_KEY, GEMINI_API_KEY,
+# R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, INTERNAL_API_KEY,
+# META_APP_ID, META_APP_SECRET, THREADS_APP_ID, THREADS_APP_SECRET,
+# GITHUB_REPO_URL, DEV_USER_EMAIL
+
+# ── Static dashboard assets ──────────────────────────────────────────
+[assets]
+directory = "./dist/dashboard"
+binding = "ASSETS"
+not_found_handling = "single-page-application"

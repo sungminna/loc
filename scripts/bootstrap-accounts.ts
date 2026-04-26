@@ -192,9 +192,12 @@ function loadDevVars(): Record<string, string> {
       const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
       if (m && m[1] && m[2] !== undefined) out[m[1]] = m[2];
     }
-    return { ...out, ...process.env };
+    for (const [k, v] of Object.entries(process.env)) if (v !== undefined) out[k] = v;
+    return out;
   } catch {
-    return process.env as Record<string, string>;
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(process.env)) if (v !== undefined) out[k] = v;
+    return out;
   }
 }
 

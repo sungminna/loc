@@ -1,20 +1,13 @@
-// R2 upload helper. R2 supports the S3 API; we use @aws-sdk/client-s3 directly
-// since Workers can't ship aws-sdk into sandbox. Sandbox is Node, so it works.
+// R2 upload via the Worker's internal endpoint — no S3 creds needed.
+// The sandbox PUTs file bytes; the Worker writes to MEDIA bucket using
+// its native R2 binding.
 
-import { readFileSync, statSync } from "node:fs";
+import { readFileSync, statSync, writeFileSync } from "node:fs";
 import { extname } from "node:path";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
-const client = new S3Client({
-  region: "auto",
-  endpoint: process.env.R2_ENDPOINT!,
-  credentials: {
-    accessKeyId: process.env.R2_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
-  },
-});
-
-const BUCKET = process.env.R2_BUCKET!;
+const BASE = process.env.LOC_API_BASE!;
+const KEY = process.env.LOC_INTERNAL_KEY!;
+const RUN_ID = process.env.LOC_RUN_ID!;
 const PUBLIC_BASE = process.env.R2_PUBLIC_BASE!;
 
 const MIME: Record<string, string> = {
@@ -28,17 +21,24 @@ const MIME: Record<string, string> = {
   ".wav": "audio/wav",
 };
 
-export async function uploadFile(localPath: string, r2Key: string): Promise<{ url: string; bytes: number; mime: string }> {
+export async function uploadFile(
+  localPath: string,
+  r2Key: string,
+): Promise<{ url: string; bytes: number; mime: string }> {
   const buf = readFileSync(localPath);
   const stat = statSync(localPath);
   const mime = MIME[extname(localPath).toLowerCase()] ?? "application/octet-stream";
-  await client.send(new PutObjectCommand({
-    Bucket: BUCKET,
-    Key: r2Key,
-    Body: buf,
-    ContentType: mime,
-    CacheControl: "public, max-age=31536000",
-  }));
+  const res = await fetch(`${BASE}/internal/r2/put?key=${encodeURIComponent(r2Key)}`, {
+    method: "PUT",
+    headers: {
+      authorization: `Bearer ${KEY}`,
+      "loc-run-id": RUN_ID,
+      "content-type": mime,
+      "content-length": String(stat.size),
+    },
+    body: buf,
+  });
+  if (!res.ok) throw new Error(`upload ${r2Key} → ${res.status} ${await res.text()}`);
   return { url: `${PUBLIC_BASE}/${r2Key}`, bytes: stat.size, mime };
 }
 
@@ -47,7 +47,6 @@ export async function downloadFile(r2Key: string, localPath: string): Promise<vo
   const res = await fetch(url);
   if (!res.ok) throw new Error(`download ${url} → ${res.status}`);
   const buf = new Uint8Array(await res.arrayBuffer());
-  const { writeFileSync } = await import("node:fs");
   writeFileSync(localPath, buf);
 }
 

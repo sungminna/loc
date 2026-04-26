@@ -43,10 +43,6 @@ export async function spawnSandboxRun(
     GEMINI_API_KEY: env.GEMINI_API_KEY,
     GEMINI_MODEL: env.GEMINI_MODEL,
     AI_GATEWAY_BASE: env.AI_GATEWAY_BASE,
-    R2_ENDPOINT: env.R2_ENDPOINT,
-    R2_ACCESS_KEY_ID: env.R2_ACCESS_KEY_ID,
-    R2_SECRET_ACCESS_KEY: env.R2_SECRET_ACCESS_KEY,
-    R2_BUCKET: env.R2_BUCKET,
     R2_PUBLIC_BASE: env.R2_PUBLIC_BASE,
     ...tokenEnv,
   };

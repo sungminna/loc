@@ -74,6 +74,22 @@ export async function handleInternal(req: Request, env: Env, path: string): Prom
     return json({ asset: row });
   }
 
+  if (req.method === "PUT" && path === "/internal/r2/put") {
+    // Sandbox-friendly R2 upload: streams body to MEDIA bucket.
+    // Auth: same Bearer + LOC-Run-Id as the rest of /internal.
+    const key = url.searchParams.get("key");
+    if (!key) return json({ error: "key required" }, 400);
+    if (!key.startsWith(`runs/${ident.runId}/`) && !key.startsWith(`audio/`)) {
+      return forbidden();
+    }
+    if (!req.body) return json({ error: "no body" }, 400);
+    const mime = req.headers.get("content-type") ?? "application/octet-stream";
+    await env.MEDIA.put(key, req.body, {
+      httpMetadata: { contentType: mime, cacheControl: "public, max-age=31536000" },
+    });
+    return json({ key, url: `${env.R2_PUBLIC_BASE}/${key}` });
+  }
+
   if (req.method === "POST" && path === "/internal/post") {
     const body = (await req.json()) as Omit<typeof posts.$inferInsert, "userId"> & { runId: string };
     if (body.runId !== ident.runId) return forbidden();

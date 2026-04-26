@@ -165,7 +165,7 @@ FOR_USER_EMAIL=you@example.com \
 | select-audio | 토픽 mood + 템플릿 mood로 NCS 트랙 1곡 선정 |
 | render-reel | Remotion → 1080×1920 H.264 MP4 + ffmpeg +faststart |
 | render-threads-image | 1080×1350 단일 프레임 JPG |
-| ig-publish-reel | Graph API v25 container/publish |
+| ig-publish-reel | Graph API v23 container/publish (graph.instagram.com) |
 | threads-publish | graph.threads.net v1 container/publish |
 
 `.claude/settings.json`은 `defaultMode: "bypassPermissions"` — sandbox 안에서 완전 자율. 단 `rm -rf /`, `mkfs`, `shutdown` 등 catastrophic 명령은 deny.

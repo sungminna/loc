@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { trpc } from "../trpc";
 import { useToast } from "../components/Toast";
 import { Modal } from "../components/Modal";
@@ -14,6 +15,9 @@ interface TemplateForm {
   defaults: Record<string, unknown>;
   defaultAudioMood: string[];
   durationSec: number;
+  accentColor: string;
+  bgPromptTemplate: string;
+  transitionPreset: "fade" | "slide-up" | "zoom" | "kenburns" | "none";
 }
 
 const EMPTY: TemplateForm = {
@@ -25,6 +29,9 @@ const EMPTY: TemplateForm = {
   defaults: {},
   defaultAudioMood: [],
   durationSec: 18,
+  accentColor: "#facc15",
+  bgPromptTemplate: "",
+  transitionPreset: "fade",
 };
 
 export function Templates() {
@@ -70,8 +77,8 @@ export function Templates() {
             {list.data?.map((t) => (
               <div key={t.id} className="card">
                 <div className="flex justify-between items-start gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium truncate">{t.name}</div>
+                  <Link to={`/templates/${t.id}`} className="flex-1 min-w-0 group">
+                    <div className="font-medium truncate group-hover:text-yellow-300 transition">{t.name}</div>
                     <div className="text-xs text-zinc-500 mt-0.5">
                       <code className="text-zinc-400">{t.slug}</code> · {t.kind} · {t.compositionId} · {t.durationSec}s
                       {t.userId === null ? " · 공유" : ""}
@@ -79,7 +86,7 @@ export function Templates() {
                     {t.defaultAudioMood.length ? <div className="text-xs text-zinc-400 mt-1.5 flex flex-wrap gap-1">
                       {t.defaultAudioMood.map((m) => <span key={m} className="px-1.5 py-0.5 bg-zinc-800 rounded">{m}</span>)}
                     </div> : null}
-                  </div>
+                  </Link>
                   {t.userId !== null ? (
                     <div className="flex flex-col gap-1 shrink-0">
                       <button className="btn btn-ghost text-xs" onClick={() => setEditing({ id: t.id, form: toForm(t) })}>편집</button>
@@ -155,11 +162,13 @@ interface TemplateRow {
   id: string; slug: string; name: string; kind: TemplateForm["kind"]; compositionId: string;
   schema: Record<string, unknown>; defaults: Record<string, unknown>;
   defaultAudioMood: string[]; durationSec: number;
+  accentColor: string; bgPromptTemplate: string; transitionPreset: TemplateForm["transitionPreset"];
 }
 function toForm(t: TemplateRow): TemplateForm {
   return {
     slug: t.slug, name: t.name, kind: t.kind, compositionId: t.compositionId,
     schema: t.schema, defaults: t.defaults, defaultAudioMood: t.defaultAudioMood,
     durationSec: t.durationSec,
+    accentColor: t.accentColor, bgPromptTemplate: t.bgPromptTemplate, transitionPreset: t.transitionPreset,
   };
 }

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import cronstrue from "cronstrue";
 import { trpc } from "../trpc";
 import { useToast } from "../components/Toast";
@@ -88,15 +89,15 @@ export function Topics() {
           <div className="space-y-3">
             {list.data?.map((t) => (
               <div key={t.id} className="card flex items-center justify-between">
-                <div className="flex-1 min-w-0">
+                <Link to={`/topics/${t.id}`} className="flex-1 min-w-0 group">
                   <div className="flex items-center gap-2">
                     <span className={`w-1.5 h-1.5 rounded-full ${t.enabled ? "bg-emerald-400" : "bg-zinc-600"}`} />
-                    <span className="font-medium">{t.name}</span>
+                    <span className="font-medium group-hover:text-yellow-300 transition">{t.name}</span>
                     <span className="text-zinc-500 text-xs uppercase">{t.lang}</span>
                   </div>
                   <div className="text-zinc-500 text-xs mt-1">{safeCron(t.cron)}</div>
                   <div className="text-zinc-500 text-xs">소스 {t.sourceUrls.length} · 템플릿 {t.templateSlugs.join(",") || "—"} · 일일 {t.dailyRunCap}회 · ${t.costCapUsd} 상한</div>
-                </div>
+                </Link>
                 <div className="flex gap-2 shrink-0 ml-4">
                   <button className="btn btn-ghost" onClick={() => runNow.mutate({ id: t.id })} disabled={runNow.isPending}>지금 실행</button>
                   <button className="btn btn-ghost" onClick={() => setEditing({ id: t.id, form: toForm(t) })}>편집</button>
@@ -251,3 +252,5 @@ function toForm(t: { id: string; name: string; description?: string | null; lang
     enabled: t.enabled,
   };
 }
+
+export { safeCron };

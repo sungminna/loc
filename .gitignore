@@ -13,3 +13,4 @@ data/cache/
 out/
 .bun/
 .playwright-mcp/
+.claude/scheduled_tasks.lock

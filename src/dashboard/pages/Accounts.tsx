@@ -32,7 +32,7 @@ export function Accounts() {
           <Empty
             icon="@"
             title="연결된 계정이 없습니다"
-            hint="위 버튼으로 Instagram Business 또는 Threads 계정을 연결하세요. (Instagram Reels는 Business 계정 + 연결된 Facebook Page 필수)"
+            hint="위 버튼으로 Instagram 또는 Threads 계정을 연결하세요. Instagram Login 플로우라 Facebook Page 연동은 필요 없으며, Reels 게시는 Business/Creator 계정이면 됩니다."
           />
         ) : (
           <div className="grid grid-cols-2 gap-4">

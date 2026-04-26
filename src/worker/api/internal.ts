@@ -3,7 +3,7 @@
 // All mutations are scoped to the run/user identified by the headers — even
 // with a stolen INTERNAL_API_KEY, a sandbox can only touch its own run.
 
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { getDb } from "@db/client";
 import {
   runs,
@@ -13,6 +13,7 @@ import {
   templates,
   audioTracks,
   researchNotes,
+  skillPrompts,
   RUN_STATUSES,
   type RunStatus,
 } from "@db/schema";
@@ -134,6 +135,35 @@ export async function handleInternal(req: Request, env: Env, path: string): Prom
     const tpl = await db.query.templates.findFirst({ where: eq(templates.slug, slug) });
     if (tpl && tpl.userId !== null && tpl.userId !== ident.userId) return forbidden();
     return json({ template: tpl });
+  }
+
+  if (req.method === "GET" && path === "/internal/skill-prompts") {
+    // Active per-user overrides — sandbox merges these into Skill prompts at runtime.
+    const rows = await db.query.skillPrompts.findMany({
+      where: and(eq(skillPrompts.userId, ident.userId), eq(skillPrompts.enabled, true)),
+    });
+    const byName = Object.fromEntries(rows.map((r) => [r.skillName, r.override]));
+    return json({ overrides: byName });
+  }
+
+  if (req.method === "GET" && path === "/internal/topic/draft") {
+    // Returns the user-prepared brief.json that the orchestrator should use
+    // verbatim instead of regenerating, plus a flag for whether it's active.
+    const t = await db.query.topics.findFirst({ where: eq(topics.id, ident.topicId) });
+    if (!t) return json({ error: "topic not found" }, 404);
+    return json({
+      useDraft: t.useDraftForNext,
+      draft: t.draftBrief ?? null,
+      imageStylePrompt: t.imageStylePrompt,
+    });
+  }
+
+  if (req.method === "POST" && path === "/internal/topic/draft/consume") {
+    // Called by the orchestrator after it has loaded the draft; flips the
+    // flag off so the next scheduled run regenerates from scratch.
+    await db.update(topics).set({ useDraftForNext: false, updatedAt: new Date() })
+      .where(eq(topics.id, ident.topicId));
+    return json({ ok: true });
   }
 
   return new Response("not found", { status: 404 });

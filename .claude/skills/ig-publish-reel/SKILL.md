@@ -19,8 +19,11 @@ bun src/sandbox/ig.ts publish-reel \
   --cover-r2-key runs/$LOC_RUN_ID/cover.jpg \
   --caption "<from brief.captions[lang]>$'\n\n'🎵 Music: <attribution>" \
   --lang ko \
-  --template-slug <slug used to render>
+  --template-slug <slug used to render> \
+  --audio-track-id <id from select-audio output>
 ```
+
+`--audio-track-id` is the `id` field returned by the `select-audio` skill (and is also recorded on `audio_tracks.lastUsedAt`). It flows into the `posts.audio_track_id` column so analytics and the Audio detail page can show usage.
 
 Stdout: `{ "postId": "...", "remoteId": "...", "permalink": "https://www.instagram.com/reel/..." }`.
 

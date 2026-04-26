@@ -49,13 +49,36 @@ export async function dispatch(env: Env): Promise<void> {
   }
 }
 
+// Statuses that mean the run has already been picked up. A re-delivered queue
+// message for one of these should ack-and-skip — never spawn a second sandbox.
+const STARTED_STATUSES = new Set([
+  "researching", "planning", "generating", "rendering", "publishing",
+  "done", "failed",
+]);
+
 export async function consume(
   batch: MessageBatch<RunMessage>,
   env: Env,
   ctx: ExecutionContext,
 ): Promise<void> {
+  const db = getDb(env.DB);
   for (const msg of batch.messages) {
     const { runId, topicId, userId } = msg.body;
+
+    // Idempotency guard: queue retries / DLQ replays can re-deliver a
+    // message after the sandbox already ran. Look up the row and bail out
+    // if it's no longer in `planned` state.
+    const existing = await db.query.runs.findFirst({ where: eq(runs.id, runId) });
+    if (!existing) {
+      // Run was deleted (e.g. user removed the topic). Drop the message.
+      msg.ack();
+      continue;
+    }
+    if (STARTED_STATUSES.has(existing.status)) {
+      msg.ack();
+      continue;
+    }
+
     const lockId = env.TOPIC_RUNNER.idFromName(`topic:${topicId}`);
     const stub = env.TOPIC_RUNNER.get(lockId);
 
@@ -73,7 +96,6 @@ export async function consume(
       spawnSandboxRun(env, runId, topicId, userId)
         .catch(async (e) => {
           const error = e instanceof Error ? e.message : String(e);
-          const db = getDb(env.DB);
           await db.update(runs).set({ status: "failed", error: error.slice(0, 4000), finishedAt: new Date() })
             .where(eq(runs.id, runId));
         })

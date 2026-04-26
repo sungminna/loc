@@ -23,6 +23,7 @@ interface Args {
   caption: string;
   lang: "ko" | "en";
   templateSlug?: string;
+  audioTrackId?: string;
 }
 
 function parseArgs(argv: string[]): Args {
@@ -37,6 +38,7 @@ function parseArgs(argv: string[]): Args {
     caption: m.get("caption") ?? "",
     lang: (m.get("lang") ?? "ko") as "ko" | "en",
     templateSlug: m.get("template-slug"),
+    audioTrackId: m.get("audio-track-id"),
   };
 }
 
@@ -60,6 +62,7 @@ async function publishReel(args: Args): Promise<void> {
     caption: args.caption,
     lang: args.lang,
     assetKeys: [args.videoR2Key, ...(args.coverR2Key ? [args.coverR2Key] : [])],
+    audioTrackId: args.audioTrackId,
   });
 
   try {
@@ -136,6 +139,6 @@ if (cmd === "publish-reel") {
     process.exit(1);
   });
 } else {
-  console.error("usage: bun src/sandbox/ig.ts publish-reel --run-id ... --video-r2-key ... --caption ... --lang ko");
+  console.error("usage: bun src/sandbox/ig.ts publish-reel --run-id ... --video-r2-key ... --caption ... --lang ko [--audio-track-id ...] [--template-slug ...] [--cover-r2-key ...]");
   process.exit(2);
 }

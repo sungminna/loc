@@ -4,6 +4,9 @@
 //   bun src/sandbox/db-cli.ts set-brief  <runId> <briefJsonPath>
 //   bun src/sandbox/db-cli.ts get-topic  <topicId>
 //   bun src/sandbox/db-cli.ts get-run    <runId>
+//   bun src/sandbox/db-cli.ts get-skill-prompts
+//   bun src/sandbox/db-cli.ts get-topic-draft
+//   bun src/sandbox/db-cli.ts consume-topic-draft
 
 import { readFileSync } from "node:fs";
 import { api } from "./lib/api";
@@ -40,6 +43,21 @@ async function main(): Promise<void> {
     if (!id) throw new Error("usage: get-run <runId>");
     const r = await api.getRun(id);
     console.log(JSON.stringify(r.run));
+    return;
+  }
+  if (cmd === "get-skill-prompts") {
+    const r = await api.getSkillPrompts();
+    console.log(JSON.stringify(r.overrides));
+    return;
+  }
+  if (cmd === "get-topic-draft") {
+    const r = await api.getTopicDraft();
+    console.log(JSON.stringify(r));
+    return;
+  }
+  if (cmd === "consume-topic-draft") {
+    await api.consumeTopicDraft();
+    console.log("ok");
     return;
   }
   console.error("unknown command");

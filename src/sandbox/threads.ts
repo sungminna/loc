@@ -17,6 +17,8 @@ interface Args {
   imageR2Key?: string;
   text: string;
   lang: "ko" | "en";
+  audioTrackId?: string;
+  templateSlug?: string;
 }
 
 function parseArgs(argv: string[]): Args {
@@ -29,6 +31,8 @@ function parseArgs(argv: string[]): Args {
     imageR2Key: m.get("image-r2-key"),
     text: m.get("text") ?? "",
     lang: (m.get("lang") ?? "ko") as "ko" | "en",
+    audioTrackId: m.get("audio-track-id"),
+    templateSlug: m.get("template-slug"),
   };
 }
 
@@ -45,11 +49,13 @@ async function publish(args: Args): Promise<void> {
   const { post } = await api.recordPost({
     runId: args.runId,
     accountId,
+    templateSlug: args.templateSlug,
     platform: "threads",
     mediaType: imageUrl ? "photo" : "text",
     caption: args.text,
     lang: args.lang,
     assetKeys: args.imageR2Key ? [args.imageR2Key] : [],
+    audioTrackId: args.audioTrackId,
   });
 
   try {
@@ -108,6 +114,6 @@ if (cmd === "publish") {
     process.exit(1);
   });
 } else {
-  console.error("usage: bun src/sandbox/threads.ts publish --run-id ... --text ... --image-r2-key ... --lang ko");
+  console.error("usage: bun src/sandbox/threads.ts publish --run-id ... --text ... --image-r2-key ... --lang ko [--audio-track-id ...] [--template-slug ...]");
   process.exit(2);
 }

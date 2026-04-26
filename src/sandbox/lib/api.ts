@@ -40,6 +40,9 @@ export const api = {
   listAudio: () => call<{ tracks: AudioTrackJson[] }>("GET", "/internal/audio/list"),
   touchAudio: (id: string) => call("POST", "/internal/audio/touch", { id }),
   getTemplate: (slug: string) => call<{ template: TemplateJson | null }>("GET", `/internal/template?slug=${slug}`),
+  getSkillPrompts: () => call<{ overrides: Record<string, string> }>("GET", "/internal/skill-prompts"),
+  getTopicDraft: () => call<{ useDraft: boolean; draft: unknown | null; imageStylePrompt: string }>("GET", "/internal/topic/draft"),
+  consumeTopicDraft: () => call("POST", "/internal/topic/draft/consume"),
 };
 
 export interface AudioTrackJson {

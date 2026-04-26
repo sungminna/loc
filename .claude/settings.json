@@ -17,7 +17,6 @@
       "Bash(rm -rf /)",
       "Bash(rm -rf /*)",
       "Bash(rm -rf ~)",
-      "Bash(:(){ :|:& };:)",
       "Bash(mkfs:*)",
       "Bash(dd if=/dev/*)",
       "Bash(shutdown:*)",

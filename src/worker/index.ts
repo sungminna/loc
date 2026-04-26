@@ -3,8 +3,8 @@ import { dispatch, consume } from "./scheduler";
 import { handleTrpc } from "./api/trpc";
 import { handleInternal } from "./api/internal";
 import { handleAudioUpload } from "./api/audio-upload";
-import { igStart, igCallback } from "./oauth/instagram";
-import { threadsStart, threadsCallback } from "./oauth/threads";
+import { igStart, igCallback, igDeauth, igDelete } from "./oauth/instagram";
+import { threadsStart, threadsCallback, threadsDeauth, threadsDelete } from "./oauth/threads";
 
 export { TopicRunner } from "./topic-runner";
 export { Sandbox } from "@cloudflare/sandbox";
@@ -32,6 +32,12 @@ export default {
     if (p === "/oauth/ig/callback") return igCallback(req, env);
     if (p === "/oauth/threads/start") return threadsStart(req, env);
     if (p === "/oauth/threads/callback") return threadsCallback(req, env);
+
+    // Meta-required webhook endpoints — signed_request is verified per handler.
+    if (p === "/oauth/ig/deauth") return igDeauth(req, env);
+    if (p === "/oauth/ig/delete") return igDelete(req, env);
+    if (p === "/oauth/threads/deauth") return threadsDeauth(req, env);
+    if (p === "/oauth/threads/delete") return threadsDelete(req, env);
 
     return env.ASSETS.fetch(req);
   },

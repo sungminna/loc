@@ -17,10 +17,12 @@ bun src/sandbox/threads.ts publish \
   --run-id $LOC_RUN_ID \
   --image-r2-key runs/$LOC_RUN_ID/threads.jpg \
   --text "<brief.threads.text>$'\n\n'🎵 Music: <attribution>" \
-  --lang ko
+  --lang ko \
+  --audio-track-id <id from select-audio output> \
+  --template-slug <slug used to render>
 ```
 
-For text-only posts, omit `--image-r2-key`.
+For text-only posts, omit `--image-r2-key`. Pass `--audio-track-id` only when the post is paired with audio (rare for Threads photo posts; the field is purely informational on the `posts` row).
 
 ## Notes
 

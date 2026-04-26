@@ -25,8 +25,11 @@ export interface Env {
   INTERNAL_API_KEY: string;
   META_APP_ID: string;
   META_APP_SECRET: string;
+  IG_APP_ID?: string;
+  IG_APP_SECRET?: string;
   THREADS_APP_ID: string;
   THREADS_APP_SECRET: string;
+  WEBHOOK_VERIFY_TOKEN?: string;
   GITHUB_REPO_URL: string;
   DEV_USER_EMAIL?: string;
 }

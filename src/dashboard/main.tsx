@@ -1,4 +1,8 @@
 import "./styles.css";
+// Load Korean translations into cronstrue's locale registry. The
+// import is for its side effect — cronstrue itself stays statically imported
+// elsewhere; this just registers `ko` so `toString(s, { locale: "ko" })` works.
+import "cronstrue/locales/ko";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -8,10 +12,13 @@ import { BrowserRouter, Link, NavLink, Route, Routes } from "react-router-dom";
 import { trpc } from "./trpc";
 import { ToastProvider } from "./components/Toast";
 import { Topics } from "./pages/Topics";
+import { TopicDetail } from "./pages/TopicDetail";
 import { Posts } from "./pages/Posts";
 import { Audio } from "./pages/Audio";
+import { AudioDetail } from "./pages/AudioDetail";
 import { Accounts } from "./pages/Accounts";
 import { Templates } from "./pages/Templates";
+import { TemplateDetail } from "./pages/TemplateDetail";
 import { Overview } from "./pages/Overview";
 
 const queryClient = new QueryClient({
@@ -83,9 +90,12 @@ function App() {
           <Routes>
             <Route path="/" element={<Overview />} />
             <Route path="/topics" element={<Topics />} />
+            <Route path="/topics/:id" element={<TopicDetail />} />
             <Route path="/templates" element={<Templates />} />
+            <Route path="/templates/:id" element={<TemplateDetail />} />
             <Route path="/accounts" element={<Accounts />} />
             <Route path="/audio" element={<Audio />} />
+            <Route path="/audio/:id" element={<AudioDetail />} />
             <Route path="/posts" element={<Posts />} />
           </Routes>
         </Shell>

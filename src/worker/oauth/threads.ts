@@ -5,6 +5,12 @@ import { accounts, oauthStates } from "@db/schema";
 import type { Env } from "@shared/env";
 import { encryptToken } from "../crypto";
 import { authenticate } from "../auth";
+import {
+  disableProviderUser,
+  extractSignedRequest,
+  parseSignedRequest,
+  purgeProviderUser,
+} from "./signed-request";
 
 const SCOPE = ["threads_basic", "threads_content_publish", "threads_manage_insights"].join(",");
 
@@ -102,6 +108,41 @@ export async function threadsCallback(req: Request, env: Env): Promise<Response>
     const msg = e instanceof Error ? e.message : String(e);
     return errorPage(`OAuth 실패: ${msg.slice(0, 200)}`);
   }
+}
+
+// ─── Meta-required webhooks ──────────────────────────────────────────
+//
+// Both endpoints receive a `signed_request` POST body that we MUST verify
+// against THREADS_APP_SECRET before acting. Anything else is rejected.
+
+export async function threadsDeauth(req: Request, env: Env): Promise<Response> {
+  const raw = await extractSignedRequest(req);
+  const payload = await parseSignedRequest(raw, env.THREADS_APP_SECRET);
+  if (!payload) return jsonRes({ error: "invalid signed_request" }, 400);
+  await disableProviderUser(env, "threads", payload.user_id);
+  return jsonRes({ success: true });
+}
+
+export async function threadsDelete(req: Request, env: Env): Promise<Response> {
+  const raw = await extractSignedRequest(req);
+  const payload = await parseSignedRequest(raw, env.THREADS_APP_SECRET);
+  if (!payload) return jsonRes({ error: "invalid signed_request" }, 400);
+  const removed = await purgeProviderUser(env, "threads", payload.user_id);
+  // Meta requires { url, confirmation_code }: a public status URL the user
+  // can visit and a code we can show to confirm the request.
+  const code = `thr-${payload.user_id}-${Date.now()}`;
+  return jsonRes({
+    url: `${env.PUBLIC_WORKER_URL}/oauth/threads/delete-status?code=${encodeURIComponent(code)}`,
+    confirmation_code: code,
+    removed,
+  });
+}
+
+function jsonRes(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
 }
 
 function successPage(msg: string): Response {

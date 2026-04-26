@@ -51,6 +51,25 @@ export type AudioPrefs = {
   fixedTrackId?: string;
 };
 
+// A storyboard "draft" — the next brief the orchestrator should render
+// instead of regenerating from scratch. Mirrors the brief.json shape that
+// content-plan would otherwise emit, but the user has hand-edited it here.
+export type DraftBrief = {
+  topic?: { headline?: string; angle?: string };
+  slides?: Array<{
+    kicker?: string;
+    headline?: string;
+    body?: string;
+    emphasis?: string;
+    bgImageUrl?: string;
+    bgImageR2Key?: string;
+    bgImagePrompt?: string;
+  }>;
+  threads?: { text?: string; bgImageUrl?: string; bgImageR2Key?: string; bgImagePrompt?: string };
+  caption?: { instagram?: string; threads?: string };
+  hashtags?: string[];
+};
+
 export const topics = sqliteTable("topics", {
   id: id(),
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -70,6 +89,9 @@ export const topics = sqliteTable("topics", {
   dailyRunCap: integer("daily_run_cap").notNull().default(1),
   costCapUsd: integer("cost_cap_usd").notNull().default(5),
   enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  imageStylePrompt: text("image_style_prompt").notNull().default(""),
+  draftBrief: text("draft_brief", { mode: "json" }).$type<DraftBrief | null>(),
+  useDraftForNext: integer("use_draft_for_next", { mode: "boolean" }).notNull().default(false),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, (t) => ({
@@ -81,6 +103,9 @@ export const topics = sqliteTable("topics", {
 // templates — Remotion compositions registered as content templates
 // (built-in templates have userId = NULL → shared across all users)
 // ─────────────────────────────────────────────────────────────────────
+export const TRANSITION_PRESETS = ["fade", "slide-up", "zoom", "kenburns", "none"] as const;
+export type TransitionPreset = (typeof TRANSITION_PRESETS)[number];
+
 export const templates = sqliteTable("templates", {
   id: id(),
   userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
@@ -95,6 +120,9 @@ export const templates = sqliteTable("templates", {
   durationSec: integer("duration_sec").notNull().default(18),
   version: integer("version").notNull().default(1),
   enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  accentColor: text("accent_color").notNull().default("#facc15"),
+  bgPromptTemplate: text("bg_prompt_template").notNull().default(""),
+  transitionPreset: text("transition_preset", { enum: TRANSITION_PRESETS }).notNull().default("fade"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, (t) => ({
@@ -243,6 +271,56 @@ export const researchNotes = sqliteTable("research_notes", {
 }));
 
 // ─────────────────────────────────────────────────────────────────────
+// skill_prompts — per-user override appended to a Skill's instruction.
+// Persisted in D1 so survives redeploys; sandbox reads via internal API.
+// ─────────────────────────────────────────────────────────────────────
+export const SKILL_NAMES = [
+  "topic-research",
+  "content-plan",
+  "image-gen",
+  "select-audio",
+  "render-reel",
+  "render-threads-image",
+  "ig-publish-reel",
+  "threads-publish",
+  "orchestrate-run",
+] as const;
+export type SkillName = (typeof SKILL_NAMES)[number];
+
+export const skillPrompts = sqliteTable("skill_prompts", {
+  id: id(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  skillName: text("skill_name", { enum: SKILL_NAMES }).notNull(),
+  override: text("override").notNull().default(""),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => ({
+  userSkillIdx: index("skill_prompts_user_skill_idx").on(t.userId, t.skillName),
+}));
+
+// ─────────────────────────────────────────────────────────────────────
+// topic_assets — dashboard-generated images, decoupled from runs.
+// User can re-roll a slide bg before any run exists; later picked up
+// by the storyboard draft and replayed by the orchestrator.
+// ─────────────────────────────────────────────────────────────────────
+export const topicAssets = sqliteTable("topic_assets", {
+  id: id(),
+  topicId: text("topic_id").notNull().references(() => topics.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  kind: text("kind", { enum: ["bg-slide", "bg-threads", "asset"] }).notNull(),
+  r2Key: text("r2_key").notNull(),
+  mime: text("mime").notNull(),
+  bytes: integer("bytes").notNull().default(0),
+  prompt: text("prompt").notNull().default(""),
+  slideIndex: integer("slide_index"),
+  meta: text("meta", { mode: "json" }).$type<Record<string, unknown>>(),
+  createdAt: createdAt(),
+}, (t) => ({
+  topicIdx: index("topic_assets_topic_idx").on(t.topicId, t.createdAt),
+}));
+
+// ─────────────────────────────────────────────────────────────────────
 // oauth_states — one-shot CSRF token; ties OAuth flow to initiating user
 // ─────────────────────────────────────────────────────────────────────
 export const oauthStates = sqliteTable("oauth_states", {
@@ -263,3 +341,5 @@ export type AudioTrack = typeof audioTracks.$inferSelect;
 export type Run = typeof runs.$inferSelect;
 export type Post = typeof posts.$inferSelect;
 export type Asset = typeof assets.$inferSelect;
+export type SkillPrompt = typeof skillPrompts.$inferSelect;
+export type TopicAsset = typeof topicAssets.$inferSelect;

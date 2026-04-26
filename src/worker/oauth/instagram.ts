@@ -11,18 +11,24 @@ import { accounts, oauthStates } from "@db/schema";
 import type { Env } from "@shared/env";
 import { encryptToken } from "../crypto";
 import { authenticate } from "../auth";
+import {
+  disableProviderUser,
+  extractSignedRequest,
+  parseSignedRequest,
+  purgeProviderUser,
+} from "./signed-request";
 
+// Minimal scopes for posting + comments. Add more once approved in app.
 const SCOPE = [
   "instagram_business_basic",
   "instagram_business_content_publish",
   "instagram_business_manage_comments",
-  "instagram_business_manage_insights",
 ].join(",");
 
 function igAppCreds(env: Env): { id: string; secret: string } {
-  // Falls back to Meta app credentials when Instagram-specific ones aren't set
-  const id = (env as unknown as { IG_APP_ID?: string }).IG_APP_ID ?? env.META_APP_ID;
-  const secret = (env as unknown as { IG_APP_SECRET?: string }).IG_APP_SECRET ?? env.META_APP_SECRET;
+  // Instagram Login uses Instagram-app credentials (NOT Meta app)
+  const id = env.IG_APP_ID ?? env.META_APP_ID;
+  const secret = env.IG_APP_SECRET ?? env.META_APP_SECRET;
   return { id, secret };
 }
 
@@ -56,6 +62,24 @@ export async function igStart(req: Request, env: Env): Promise<Response> {
 
 export async function igCallback(req: Request, env: Env): Promise<Response> {
   const url = new URL(req.url);
+
+  // Meta webhook verify handshake (when this URL is also configured as a
+  // Webhook Callback URL). Echo back hub.challenge if verify_token matches.
+  const hubMode = url.searchParams.get("hub.mode") ?? url.searchParams.get("hub_mode");
+  if (hubMode === "subscribe") {
+    if (!env.WEBHOOK_VERIFY_TOKEN) {
+      // Refuse to fall back to a default — the verify token is the only
+      // thing keeping a stranger from registering this URL as their webhook.
+      return new Response("WEBHOOK_VERIFY_TOKEN not configured", { status: 503 });
+    }
+    const challenge = url.searchParams.get("hub.challenge") ?? url.searchParams.get("hub_challenge") ?? "";
+    const verify = url.searchParams.get("hub.verify_token") ?? url.searchParams.get("hub_verify_token") ?? "";
+    if (verify === env.WEBHOOK_VERIFY_TOKEN) {
+      return new Response(challenge, { headers: { "content-type": "text/plain" } });
+    }
+    return new Response("verify token mismatch", { status: 403 });
+  }
+
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
   if (!code || !state) return errorPage("missing code/state");
@@ -127,6 +151,41 @@ export async function igCallback(req: Request, env: Env): Promise<Response> {
     const msg = e instanceof Error ? e.message : String(e);
     return errorPage(`OAuth 실패: ${msg.slice(0, 300)}`);
   }
+}
+
+// ─── Meta-required webhooks ──────────────────────────────────────────
+//
+// Instagram Login uses the Instagram-app credentials (IG_APP_SECRET, falling
+// back to META_APP_SECRET — same pair we use for the OAuth flow above).
+
+export async function igDeauth(req: Request, env: Env): Promise<Response> {
+  const { secret } = igAppCreds(env);
+  const raw = await extractSignedRequest(req);
+  const payload = await parseSignedRequest(raw, secret);
+  if (!payload) return jsonRes({ error: "invalid signed_request" }, 400);
+  await disableProviderUser(env, "instagram", payload.user_id);
+  return jsonRes({ success: true });
+}
+
+export async function igDelete(req: Request, env: Env): Promise<Response> {
+  const { secret } = igAppCreds(env);
+  const raw = await extractSignedRequest(req);
+  const payload = await parseSignedRequest(raw, secret);
+  if (!payload) return jsonRes({ error: "invalid signed_request" }, 400);
+  const removed = await purgeProviderUser(env, "instagram", payload.user_id);
+  const code = `ig-${payload.user_id}-${Date.now()}`;
+  return jsonRes({
+    url: `${env.PUBLIC_WORKER_URL}/oauth/ig/delete-status?code=${encodeURIComponent(code)}`,
+    confirmation_code: code,
+    removed,
+  });
+}
+
+function jsonRes(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
 }
 
 function successPage(msg: string): Response {

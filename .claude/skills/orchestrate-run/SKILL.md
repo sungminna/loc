@@ -26,8 +26,9 @@ You are running one autonomous cycle for a single topic. The runId and topicId a
 
 4. **Generate images** (status: `generating`)
    - `bun src/sandbox/db-cli.ts set-status "$LOC_RUN_ID" generating`
-   - For each `slides[i].bgImagePrompt` in the brief, run the **gemini-image** skill with `--aspect 9:16 --kind gemini-bg`. Capture the resulting r2Key into the brief at `slides[i].bgImageR2Key`.
-   - For `threads.bgImagePrompt`, run with `--aspect 4:5 --kind gemini-bg`. Set `threads.bgImageR2Key`.
+   - For each `slides[i].bgImagePrompt` in the brief, run the **image-gen** skill with `--aspect 2:3 --kind gemini-bg --user-id "$LOC_USER_ID"`. Capture the resulting r2Key into the brief at `slides[i].bgImageR2Key`.
+   - For `threads.bgImagePrompt`, run with `--aspect 2:3 --kind gemini-bg --user-id "$LOC_USER_ID"`. Set `threads.bgImageR2Key`.
+   - (GPT Image 2 only supports 1:1, 3:2, 2:3. Templates `objectFit: cover` so any input fills the slide.)
    - Re-save the updated brief.
 
 5. **Pick audio**

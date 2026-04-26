@@ -16,13 +16,12 @@ export interface Env {
   // Vars
   PUBLIC_WORKER_URL: string;
   R2_PUBLIC_BASE: string;
-  GEMINI_MODEL: string;
   AI_GATEWAY_BASE: string;
 
   // Secrets
   CLAUDE_CODE_OAUTH_TOKEN: string;
   LOC_MASTER_KEY: string;
-  GEMINI_API_KEY: string;
+  REPLICATE_API_TOKEN: string;
   INTERNAL_API_KEY: string;
   META_APP_ID: string;
   META_APP_SECRET: string;

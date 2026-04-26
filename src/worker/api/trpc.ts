@@ -7,6 +7,8 @@ import { CronExpressionParser } from "cron-parser";
 import {
   topics, templates, accounts, audioTracks, posts, runs, assets,
   researchNotes, skillPrompts, topicAssets, SKILL_NAMES, TRANSITION_PRESETS,
+  TEMPLATE_KINDS, TEMPLATE_PLATFORMS, TEMPLATE_BG_MODES,
+  IMAGE_MODES, THREADS_FORMATS, HASHTAG_MODES,
   type Account,
 } from "@db/schema";
 import type { Env } from "@shared/env";
@@ -86,12 +88,17 @@ const topicInputSchema = z.object({
   costCapUsd: z.number().int().min(1).max(100).default(5),
   enabled: z.boolean().default(true),
   imageStylePrompt: z.string().max(1000).default(""),
+  imageMode: z.enum(IMAGE_MODES).default("ai-all"),
+  threadsFormat: z.enum(THREADS_FORMATS).default("image"),
+  hashtagMode: z.enum(HASHTAG_MODES).default("ai"),
+  fixedHashtags: z.array(z.string().min(1).max(60)).max(30).default([]),
 });
 
 const templateInputSchema = z.object({
   slug: z.string().min(1).max(60).regex(/^[a-z0-9-]+$/, "kebab-case only"),
   name: z.string().min(1).max(80),
-  kind: z.enum(["reel-cards", "reel-animated", "threads-photo"]),
+  kind: z.enum(TEMPLATE_KINDS),
+  platform: z.enum(TEMPLATE_PLATFORMS).default("instagram"),
   compositionId: z.string().min(1).max(60),
   schema: z.record(z.unknown()).default({}),
   defaults: z.record(z.unknown()).default({}),
@@ -100,6 +107,8 @@ const templateInputSchema = z.object({
   accentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, "hex color #RRGGBB").default("#facc15"),
   bgPromptTemplate: z.string().max(2000).default(""),
   transitionPreset: z.enum(TRANSITION_PRESETS).default("fade"),
+  bgMode: z.enum(TEMPLATE_BG_MODES).default("ai"),
+  defaultBgR2Key: z.string().max(255).default(""),
 });
 
 const slideSchema = z.object({
@@ -112,9 +121,37 @@ const slideSchema = z.object({
   bgImagePrompt: z.string().optional(),
 });
 
+const videoSceneSchema = z.object({
+  kicker: z.string().optional(),
+  chapter: z.string().optional(),
+  headline: z.string().optional(),
+  body: z.string().optional(),
+  stat: z.object({
+    value: z.string().optional(),
+    label: z.string().optional(),
+    suffix: z.string().optional(),
+  }).optional(),
+  videoPrompt: z.string().optional(),
+  durationSec: z.number().optional(),
+  aspectRatio: z.enum(["16:9", "4:3", "1:1", "3:4", "9:16", "21:9", "adaptive"]).optional(),
+  resolution: z.enum(["480p", "720p"]).optional(),
+  generateAudio: z.boolean().optional(),
+  seed: z.number().optional(),
+  cameraMove: z.string().optional(),
+  mood: z.string().optional(),
+  firstFrameImagePrompt: z.string().optional(),
+  firstFrameImageR2Key: z.string().optional(),
+  lastFrameImagePrompt: z.string().optional(),
+  lastFrameImageR2Key: z.string().optional(),
+  videoR2Key: z.string().optional(),
+});
+
 const draftBriefSchema = z.object({
   topic: z.object({ headline: z.string().optional(), angle: z.string().optional() }).optional(),
   slides: z.array(slideSchema).max(20).optional(),
+  video: z.object({
+    scenes: z.array(videoSceneSchema).max(10).optional(),
+  }).optional(),
   threads: z.object({
     text: z.string().optional(),
     bgImageUrl: z.string().optional(),
@@ -123,6 +160,7 @@ const draftBriefSchema = z.object({
   }).optional(),
   caption: z.object({ instagram: z.string().optional(), threads: z.string().optional() }).optional(),
   hashtags: z.array(z.string()).optional(),
+  threadsTopicTag: z.string().max(50).optional(),
 });
 
 const audioInputSchema = z.object({
@@ -318,6 +356,7 @@ export const appRouter = t.router({
           slug: input.newSlug,
           name: `${src.name} (copy)`,
           kind: src.kind,
+          platform: src.platform,
           compositionId: src.compositionId,
           schema: src.schema,
           defaults: src.defaults,
@@ -326,6 +365,8 @@ export const appRouter = t.router({
           accentColor: src.accentColor,
           bgPromptTemplate: src.bgPromptTemplate,
           transitionPreset: src.transitionPreset,
+          bgMode: src.bgMode,
+          defaultBgR2Key: src.defaultBgR2Key,
         }).returning();
         return row;
       }),

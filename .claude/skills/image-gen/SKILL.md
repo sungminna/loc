@@ -21,11 +21,11 @@ bun src/sandbox/image-gen.ts gen \
   --user-id "$LOC_USER_ID" \    # OpenAI abuse tracking
   --out-dir data/runs/$LOC_RUN_ID/img \
   --run-id $LOC_RUN_ID \
-  --kind gemini-bg              # asset.kind (legacy name; covers any AI-gen bg)
+  --kind image-bg               # asset.kind for any AI-generated background
 ```
 
 Stdout: NDJSON, one line per image.
-`{ "assetId": "...", "r2Key": "runs/<runId>/gemini-bg/<file>.webp", "url": "https://pub-...r2.dev/...", ... }`
+`{ "assetId": "...", "r2Key": "runs/<runId>/image-bg/<file>.webp", "url": "https://pub-...r2.dev/...", ... }`
 
 Capture the `r2Key` and write it back into the brief.json at:
 - `slides[i].bgImageR2Key` for slide backgrounds (use `--aspect 2:3`)

@@ -14,7 +14,7 @@
 //     --user-id <userId> \
 //     --out-dir data/runs/<runId>/img \
 //     --run-id <runId> \
-//     --kind gemini-bg                   # asset.kind enum (kept name for back-compat)
+//     --kind image-bg                    # asset.kind enum: image-bg|thumb|threads-jpg|video-frame
 //
 // Stdout: NDJSON, one line per image: { assetId, r2Key, url, localPath, mime, bytes }
 
@@ -39,7 +39,7 @@ interface Args {
   userId: string | undefined;
   outDir: string;
   runId: string;
-  kind: "gemini-bg" | "thumb" | "threads-jpg";
+  kind: "image-bg" | "thumb" | "threads-jpg" | "video-frame";
 }
 
 function parseArgs(argv: string[]): Args {
@@ -65,7 +65,7 @@ function parseArgs(argv: string[]): Args {
     userId: map.get("user-id"),
     outDir: map.get("out-dir") ?? "/tmp/image-gen",
     runId: map.get("run-id") ?? "",
-    kind: ((map.get("kind") ?? "gemini-bg") as Args["kind"]),
+    kind: ((map.get("kind") ?? "image-bg") as Args["kind"]),
   };
 }
 
@@ -188,7 +188,7 @@ if (cmd === "gen") {
     process.exit(1);
   });
 } else {
-  console.error(`usage: bun src/sandbox/image-gen.ts gen --prompt ... --aspect 2:3 [...flags] --out-dir ... --run-id ... --kind gemini-bg
+  console.error(`usage: bun src/sandbox/image-gen.ts gen --prompt ... --aspect 2:3 [...flags] --out-dir ... --run-id ... --kind image-bg
 
 Flags (all optional except --prompt, --run-id, --out-dir):
   --aspect              1:1 | 3:2 | 2:3              (default: 2:3)
@@ -200,7 +200,7 @@ Flags (all optional except --prompt, --run-id, --out-dir):
   --moderation          auto | low                    (default: auto)
   --input-image <url>   reference image (repeatable)
   --user-id <id>        OpenAI user_id for abuse tracking
-  --kind                gemini-bg | thumb | threads-jpg  (asset.kind, default: gemini-bg)
+  --kind                image-bg | thumb | threads-jpg | video-frame  (asset.kind, default: image-bg)
 `);
   process.exit(2);
 }

@@ -65,10 +65,50 @@ export type DraftBrief = {
     bgImageR2Key?: string;
     bgImagePrompt?: string;
   }>;
+  // Optional video reel storyboard — used when the chosen template's
+  // compositionId expects a SeedanceReel-style brief. Each scene becomes
+  // one Seedance 2.0 prediction; the rendered MP4s are stitched together
+  // by the SeedanceReel composition with infographic overlay.
+  video?: {
+    scenes?: Array<{
+      kicker?: string;
+      headline?: string;
+      body?: string;
+      stat?: { value?: string; label?: string };
+      // Seedance 2.0 inputs
+      videoPrompt?: string;
+      durationSec?: number;       // 3-12, or -1 for adaptive
+      aspectRatio?: "16:9" | "4:3" | "1:1" | "3:4" | "9:16" | "21:9" | "adaptive";
+      resolution?: "480p" | "720p";
+      generateAudio?: boolean;
+      seed?: number;
+      cameraMove?: string;        // free-form, gets baked into the prompt
+      mood?: string;
+      // gpt-image-2 reference for character/style consistency
+      firstFrameImagePrompt?: string;
+      firstFrameImageR2Key?: string;
+      lastFrameImagePrompt?: string;
+      lastFrameImageR2Key?: string;
+      // post-generation asset
+      videoR2Key?: string;
+    }>;
+  };
   threads?: { text?: string; bgImageUrl?: string; bgImageR2Key?: string; bgImagePrompt?: string };
   caption?: { instagram?: string; threads?: string };
   hashtags?: string[];
+  // Threads-only single indexed tag (Meta's `topic_tag` param). Distinct
+  // from inline `#` hashtags inside the post text.
+  threadsTopicTag?: string;
 };
+
+export const IMAGE_MODES = ["ai-all", "ai-first-only", "template-only"] as const;
+export type ImageMode = (typeof IMAGE_MODES)[number];
+
+export const THREADS_FORMATS = ["text", "image"] as const;
+export type ThreadsFormat = (typeof THREADS_FORMATS)[number];
+
+export const HASHTAG_MODES = ["ai", "fixed", "mixed"] as const;
+export type HashtagMode = (typeof HASHTAG_MODES)[number];
 
 export const topics = sqliteTable("topics", {
   id: id(),
@@ -92,6 +132,19 @@ export const topics = sqliteTable("topics", {
   imageStylePrompt: text("image_style_prompt").notNull().default(""),
   draftBrief: text("draft_brief", { mode: "json" }).$type<DraftBrief | null>(),
   useDraftForNext: integer("use_draft_for_next", { mode: "boolean" }).notNull().default(false),
+  // How aggressively the orchestrator should AI-generate slide backgrounds.
+  // ai-all: every slide uses gpt-image-2. ai-first-only: slide 0 only,
+  // others fall back to template.defaultBgR2Key (or gradient). template-only:
+  // never call gpt-image-2; all slides use the template's static bg.
+  imageMode: text("image_mode", { enum: IMAGE_MODES }).notNull().default("ai-all"),
+  // Threads can be plain-text or text-with-image. Independent of the IG
+  // template choice — a topic with both targets renders Reels for IG and a
+  // Threads post in this shape.
+  threadsFormat: text("threads_format", { enum: THREADS_FORMATS }).notNull().default("image"),
+  // Hashtag composition strategy. ai: AI generates fresh per-run.
+  // fixed: only `fixedHashtags` is appended. mixed: AI + fixed merged.
+  hashtagMode: text("hashtag_mode", { enum: HASHTAG_MODES }).notNull().default("ai"),
+  fixedHashtags: text("fixed_hashtags", { mode: "json" }).$type<string[]>().notNull().default(sql`'[]'`),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, (t) => ({
@@ -106,12 +159,25 @@ export const topics = sqliteTable("topics", {
 export const TRANSITION_PRESETS = ["fade", "slide-up", "zoom", "kenburns", "none"] as const;
 export type TransitionPreset = (typeof TRANSITION_PRESETS)[number];
 
+export const TEMPLATE_KINDS = ["reel-cards", "reel-animated", "reel-video", "threads-photo"] as const;
+export type TemplateKind = (typeof TEMPLATE_KINDS)[number];
+
+export const TEMPLATE_PLATFORMS = ["instagram", "threads"] as const;
+export type TemplatePlatform = (typeof TEMPLATE_PLATFORMS)[number];
+
+export const TEMPLATE_BG_MODES = ["ai", "default-image"] as const;
+export type TemplateBgMode = (typeof TEMPLATE_BG_MODES)[number];
+
 export const templates = sqliteTable("templates", {
   id: id(),
   userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
   slug: text("slug").notNull(),
   name: text("name").notNull(),
-  kind: text("kind", { enum: ["reel-cards", "reel-animated", "threads-photo"] }).notNull(),
+  kind: text("kind", { enum: TEMPLATE_KINDS }).notNull(),
+  // Which platform this template targets. Derived once from kind at seed
+  // time, but stored explicitly so the dashboard can group templates and
+  // the orchestrator can reject a mismatched topic→template mapping.
+  platform: text("platform", { enum: TEMPLATE_PLATFORMS }).notNull().default("instagram"),
   compositionId: text("composition_id").notNull(),
   schema: text("schema", { mode: "json" }).$type<Record<string, unknown>>().notNull().default(sql`'{}'`),
   defaults: text("defaults", { mode: "json" }).$type<Record<string, unknown>>().notNull().default(sql`'{}'`),
@@ -123,6 +189,13 @@ export const templates = sqliteTable("templates", {
   accentColor: text("accent_color").notNull().default("#facc15"),
   bgPromptTemplate: text("bg_prompt_template").notNull().default(""),
   transitionPreset: text("transition_preset", { enum: TRANSITION_PRESETS }).notNull().default("fade"),
+  // Default background behavior. `ai` = orchestrator generates per-slide
+  // backgrounds via gpt-image-2 (current default). `default-image` = use
+  // `defaultBgR2Key` as the static background for every slide; the
+  // orchestrator skips image-gen entirely and topics with imageMode=ai-*
+  // can still opt back into AI for some/all slides.
+  bgMode: text("bg_mode", { enum: TEMPLATE_BG_MODES }).notNull().default("ai"),
+  defaultBgR2Key: text("default_bg_r2_key").notNull().default(""),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, (t) => ({
@@ -243,7 +316,7 @@ export const assets = sqliteTable("assets", {
   id: id(),
   runId: text("run_id").notNull().references(() => runs.id, { onDelete: "cascade" }),
   kind: text("kind", {
-    enum: ["gemini-bg", "slide-png", "reel-mp4", "thumb", "threads-jpg", "audio-mix"],
+    enum: ["image-bg", "slide-png", "reel-mp4", "thumb", "threads-jpg", "audio-mix", "seedance-mp4", "video-frame"],
   }).notNull(),
   r2Key: text("r2_key").notNull(),
   mime: text("mime").notNull(),

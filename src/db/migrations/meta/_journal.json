@@ -15,6 +15,20 @@
       "when": 1777995600000,
       "tag": "0001_storyboards_and_skills",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1782604800000,
+      "tag": "0002_template_modes_and_topic_autonomy",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1745646000000,
+      "tag": "0003_rename_image_kind",
+      "breakpoints": true
     }
   ]
 }

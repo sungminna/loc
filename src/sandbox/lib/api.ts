@@ -70,12 +70,17 @@ export interface TemplateJson {
   id: string;
   slug: string;
   name: string;
-  kind: "reel-cards" | "reel-animated" | "threads-photo";
+  kind: "reel-cards" | "reel-animated" | "reel-video" | "threads-photo";
+  platform: "instagram" | "threads";
   compositionId: string;
   schema: Record<string, unknown>;
   defaults: Record<string, unknown>;
   defaultAudioMood: string[];
   durationSec: number;
+  bgMode: "ai" | "default-image";
+  defaultBgR2Key: string;
+  bgPromptTemplate: string;
+  accentColor: string;
 }
 
 export interface TopicJson {
@@ -83,9 +88,14 @@ export interface TopicJson {
   name: string;
   lang: "ko" | "en" | "ko+en";
   personaPrompt: string;
+  imageStylePrompt: string;
   sourceUrls: string[];
   targetAccounts: { instagram?: string; threads?: string };
   templateSlugs: string[];
   audioPrefs: { moodTags?: string[]; allowedSources?: string[]; fixedTrackId?: string };
   cron: string;
+  imageMode: "ai-all" | "ai-first-only" | "template-only";
+  threadsFormat: "text" | "image";
+  hashtagMode: "ai" | "fixed" | "mixed";
+  fixedHashtags: string[];
 }

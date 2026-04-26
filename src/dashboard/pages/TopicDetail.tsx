@@ -5,6 +5,8 @@ import { trpc } from "../trpc";
 import { useToast } from "../components/Toast";
 import { Skeleton, ErrorBox } from "../components/States";
 import { Field } from "../components/Field";
+import { LivePlayer } from "../components/LivePlayer";
+import { getComposition } from "../components/composition-registry";
 
 const TABS = ["overview", "storyboard", "runs", "prompts", "posts"] as const;
 type Tab = (typeof TABS)[number];
@@ -120,6 +122,10 @@ interface TopicLite {
   enabled: boolean;
   draftBrief: unknown;
   useDraftForNext: boolean;
+  imageMode: "ai-all" | "ai-first-only" | "template-only";
+  threadsFormat: "text" | "image";
+  hashtagMode: "ai" | "fixed" | "mixed";
+  fixedHashtags: string[];
 }
 
 function OverviewTab({ topic, onSaved }: { topic: TopicLite; onSaved: () => void }) {
@@ -147,6 +153,10 @@ function OverviewTab({ topic, onSaved }: { topic: TopicLite; onSaved: () => void
     dailyRunCap: topic.dailyRunCap,
     costCapUsd: topic.costCapUsd,
     enabled: topic.enabled,
+    imageMode: topic.imageMode,
+    threadsFormat: topic.threadsFormat,
+    hashtagMode: topic.hashtagMode,
+    fixedHashtags: topic.fixedHashtags,
   });
 
   return (
@@ -218,6 +228,42 @@ function OverviewTab({ topic, onSaved }: { topic: TopicLite; onSaved: () => void
           onChange={(e) => setForm({ ...form, audioPrefs: { ...form.audioPrefs, moodTags: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) } })} />
       </Field>
 
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="이미지 자동화" hint="AI가 슬라이드 배경을 얼마나 자율적으로 만들지. ai-all = 전체 자동, ai-first-only = 첫 슬라이드만, template-only = 템플릿 기본만.">
+          <select className="input" value={form.imageMode}
+            onChange={(e) => setForm({ ...form, imageMode: e.target.value as TopicLite["imageMode"] })}>
+            <option value="ai-all">AI 전체 자동 생성</option>
+            <option value="ai-first-only">첫 슬라이드만 AI · 나머지 템플릿</option>
+            <option value="template-only">템플릿 기본 이미지만</option>
+          </select>
+        </Field>
+        <Field label="Threads 포맷" hint="text = 글만, image = ThreadsCard 이미지+글">
+          <select className="input" value={form.threadsFormat}
+            onChange={(e) => setForm({ ...form, threadsFormat: e.target.value as TopicLite["threadsFormat"] })}>
+            <option value="image">이미지 + 글</option>
+            <option value="text">글만</option>
+          </select>
+        </Field>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="해시태그 모드" hint="ai = 매 실행마다 새로 생성. fixed = 고정만. mixed = 둘 다 합쳐서 dedupe.">
+          <select className="input" value={form.hashtagMode}
+            onChange={(e) => setForm({ ...form, hashtagMode: e.target.value as TopicLite["hashtagMode"] })}>
+            <option value="ai">AI 자동 생성</option>
+            <option value="fixed">고정만</option>
+            <option value="mixed">AI + 고정</option>
+          </select>
+        </Field>
+        <Field label="고정 해시태그" hint="공백/콤마 구분. # 자동 제거. fixed/mixed 모드에서 사용.">
+          <input className="input" value={form.fixedHashtags.join(" ")}
+            onChange={(e) => setForm({
+              ...form,
+              fixedHashtags: e.target.value.split(/[\s,]+/).map((s) => s.replace(/^#+/, "")).filter(Boolean).slice(0, 30),
+            })} />
+        </Field>
+      </div>
+
       <div className="grid grid-cols-3 gap-3">
         <Field label="일일 실행 상한">
           <input className="input" type="number" min={1} max={20} value={form.dailyRunCap}
@@ -249,14 +295,38 @@ interface SlideDraft {
   headline?: string;
   body?: string;
   emphasis?: string;
+  attribution?: string;
+  stat?: { value?: string; label?: string; suffix?: string };
   bgImageUrl?: string;
   bgImageR2Key?: string;
   bgImagePrompt?: string;
 }
 
+interface SceneDraft {
+  kicker?: string;
+  chapter?: string;
+  headline?: string;
+  body?: string;
+  stat?: { value?: string; label?: string; suffix?: string };
+  videoPrompt?: string;
+  durationSec?: number;
+  aspectRatio?: "16:9" | "4:3" | "1:1" | "3:4" | "9:16" | "21:9" | "adaptive";
+  resolution?: "480p" | "720p";
+  generateAudio?: boolean;
+  seed?: number;
+  cameraMove?: string;
+  mood?: string;
+  firstFrameImagePrompt?: string;
+  firstFrameImageR2Key?: string;
+  lastFrameImagePrompt?: string;
+  lastFrameImageR2Key?: string;
+  videoR2Key?: string;
+}
+
 interface DraftBrief {
   topic?: { headline?: string; angle?: string };
   slides?: SlideDraft[];
+  video?: { scenes?: SceneDraft[]; accent?: string };
   threads?: { text?: string; bgImageUrl?: string; bgImageR2Key?: string; bgImagePrompt?: string };
   caption?: { instagram?: string; threads?: string };
   hashtags?: string[];
@@ -283,6 +353,11 @@ function StoryboardTab({
 }) {
   const utils = trpc.useUtils();
   const toast = useToast();
+  const templates = trpc.templates.list.useQuery();
+  const selectedTemplate = (templates.data ?? []).find((t) => t.slug === topic.templateSlugs[0]);
+  const compositionId = selectedTemplate?.compositionId ?? "CardNews";
+  const templateAccent = selectedTemplate?.accentColor ?? "#facc15";
+  const isVideoReel = compositionId === "SeedanceReel" || selectedTemplate?.kind === "reel-video";
 
   const saveDraft = trpc.topics.saveDraft.useMutation({
     onSuccess: () => { utils.topics.get.invalidate({ id: topic.id }); onSaved(); toast({ tone: "ok", msg: "초안 저장됨" }); },
@@ -315,8 +390,10 @@ function StoryboardTab({
   const initial: DraftBrief = useMemo(() => {
     if (topic.draftBrief && typeof topic.draftBrief === "object") return topic.draftBrief as DraftBrief;
     if (lastBrief && typeof lastBrief === "object") return briefShape(lastBrief);
-    return { slides: defaultSlides() };
-  }, [topic.id]);
+    return isVideoReel
+      ? { slides: defaultSlides(), video: { scenes: defaultScenes() } }
+      : { slides: defaultSlides() };
+  }, [topic.id, isVideoReel]);
 
   const [draft, setDraft] = useState<DraftBrief>(initial);
   const [genIdx, setGenIdx] = useState<number | null>(null);
@@ -396,11 +473,53 @@ function StoryboardTab({
     }
   }
 
+  // ─── Live preview props (passed to LivePlayer above) ────────────
+  const previewProps = useMemo<Record<string, unknown>>(() => {
+    if (isVideoReel) {
+      const scenes = (draft.video?.scenes ?? []).map((s) => ({
+        kicker: s.kicker,
+        chapter: s.chapter,
+        headline: s.headline,
+        body: s.body,
+        stat: s.stat?.value ? { value: s.stat.value, label: s.stat.label, suffix: s.stat.suffix } : undefined,
+        durationSec: s.durationSec ?? 5,
+        videoUrl: s.videoR2Key ? `${publicMediaBase}/${s.videoR2Key}` : undefined,
+      }));
+      return {
+        brand: { handle: "@yourhandle", name: "Loc" },
+        lang: topic.lang === "en" ? "en" : "ko",
+        accent: draft.video?.accent ?? templateAccent,
+        scenes: scenes.length ? scenes : undefined,
+      };
+    }
+    const slides = (draft.slides ?? []).map((s) => ({
+      kicker: s.kicker,
+      headline: s.headline ?? "",
+      body: s.body,
+      emphasis: s.emphasis,
+      attribution: s.attribution,
+      stat: s.stat?.value ? { value: s.stat.value, label: s.stat.label, suffix: s.stat.suffix } : undefined,
+      bgImageUrl: s.bgImageUrl ?? (s.bgImageR2Key ? `${publicMediaBase}/${s.bgImageR2Key}` : undefined),
+    }));
+    return {
+      brand: { handle: "@yourhandle", name: "Loc" },
+      lang: topic.lang === "en" ? "en" : "ko",
+      slides: slides.length ? slides : undefined,
+    };
+  }, [draft, publicMediaBase, isVideoReel, templateAccent, topic.lang]);
+
   return (
     <section className="space-y-5">
+      {/* ─── Save bar ─────────────────────────────────── */}
       <div className="card flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <div className="font-medium">초안 ({draft.slides?.length ?? 0} 슬라이드)</div>
+          <div className="font-medium">
+            초안 ·{" "}
+            {isVideoReel
+              ? `${draft.video?.scenes?.length ?? 0} 씬`
+              : `${draft.slides?.length ?? 0} 슬라이드`}
+            {selectedTemplate ? <span className="ml-2 text-xs text-zinc-500">({selectedTemplate.name} · {compositionId})</span> : null}
+          </div>
           <div className="text-xs text-zinc-500 mt-1">
             저장하면 D1에 영구 보존되고 재배포 후에도 유지됩니다. “다음 실행에 사용” ON이면 orchestrate-run 스킬이 이 brief를 그대로 사용합니다.
           </div>
@@ -418,6 +537,38 @@ function StoryboardTab({
         </div>
       </div>
 
+      {/* ─── Full draft preview ─────────────────────────── */}
+      <div className="grid grid-cols-[300px_1fr] gap-5">
+        <div>
+          <div className="text-xs text-zinc-500 mb-2">전체 미리보기 · {compositionId}</div>
+          <LivePlayer
+            compositionId={compositionId}
+            inputProps={previewProps}
+            controls
+            loop
+            autoPlay
+          />
+        </div>
+        <div className="card text-xs space-y-2 leading-relaxed">
+          <div className="text-zinc-300 font-medium">미리보기는 현재 초안을 그대로 재생합니다.</div>
+          <ul className="text-zinc-500 space-y-1.5 list-disc pl-4">
+            {isVideoReel ? (
+              <>
+                <li>각 씬 영상 클립은 <code className="text-zinc-300">bytedance/seedance-2.0</code>이 런타임에 생성합니다. 아직 비어있는 씬은 그라데이션으로 표시됨.</li>
+                <li>오버레이(챕터·헤드라인·stat 카드)는 입력한 텍스트가 그대로 적용됩니다.</li>
+                <li>씬 prompt/duration/aspectRatio 등 모든 Seedance 파라미터를 아래 ScenesEditor에서 조정.</li>
+              </>
+            ) : (
+              <>
+                <li>슬라이드 배경 이미지는 위에서 직접 생성한 것이 있으면 반영됩니다. 없으면 그라데이션 (런타임에 <code className="text-zinc-300">openai/gpt-image-2</code>가 채움).</li>
+                <li>헤드라인/본문/kicker/emphasis/stat은 모두 입력한 그대로 렌더링.</li>
+                <li>전체 길이는 슬라이드 수에 따라 자동 계산 (각 ~3-3.5초).</li>
+              </>
+            )}
+          </ul>
+        </div>
+      </div>
+
       <div className="card space-y-3">
         <h3 className="font-semibold">토픽 헤더</h3>
         <div className="grid grid-cols-2 gap-3">
@@ -432,68 +583,45 @@ function StoryboardTab({
         </div>
       </div>
 
-      <div className="space-y-3">
-        {(draft.slides ?? []).map((slide, i) => (
-          <div key={i} className="card grid grid-cols-[160px_1fr] gap-4">
-            <SlideThumb url={slide.bgImageUrl} loading={genIdx === i} accent="#facc15" index={i} total={draft.slides?.length ?? 1} />
-            <div className="space-y-3 min-w-0">
-              <div className="flex items-center justify-between">
-                <div className="font-mono text-xs text-zinc-500">slide #{i + 1}</div>
-                <div className="flex gap-1">
-                  <button className="btn btn-ghost text-xs" onClick={() => moveSlide(i, -1)} disabled={i === 0}>↑</button>
-                  <button className="btn btn-ghost text-xs" onClick={() => moveSlide(i, 1)} disabled={i === (draft.slides?.length ?? 0) - 1}>↓</button>
-                  <button className="btn btn-danger text-xs" onClick={() => removeSlide(i)}>삭제</button>
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                <Field label="Kicker">
-                  <input className="input text-sm" value={slide.kicker ?? ""}
-                    onChange={(e) => setSlide(i, { kicker: e.target.value })} />
-                </Field>
-                <Field label="Emphasis">
-                  <input className="input text-sm" value={slide.emphasis ?? ""}
-                    onChange={(e) => setSlide(i, { emphasis: e.target.value })} placeholder="🔖" />
-                </Field>
-                <Field label="bg R2 key" hint="자동으로 채워짐">
-                  <input className="input text-xs font-mono" value={slide.bgImageR2Key ?? ""}
-                    onChange={(e) => setSlide(i, { bgImageR2Key: e.target.value })} />
-                </Field>
-              </div>
-              <Field label="Headline">
-                <input className="input" value={slide.headline ?? ""}
-                  onChange={(e) => setSlide(i, { headline: e.target.value })} />
-              </Field>
-              <Field label="Body">
-                <textarea className="input min-h-20" value={slide.body ?? ""}
-                  onChange={(e) => setSlide(i, { body: e.target.value })} />
-              </Field>
-              <div className="border-t border-zinc-800 pt-3">
-                <Field label="배경 이미지 프롬프트" hint="topic.imageStylePrompt 가 자동으로 앞에 붙습니다.">
-                  <textarea className="input min-h-16 font-mono text-xs" value={slide.bgImagePrompt ?? ""}
-                    onChange={(e) => setSlide(i, { bgImagePrompt: e.target.value })}
-                    placeholder="bold composition, single focal subject, high contrast..." />
-                </Field>
-                <div className="flex justify-end mt-2 gap-2">
-                  {slide.bgImageR2Key ? (
-                    <button className="btn btn-ghost text-xs" onClick={() => setSlide(i, { bgImageR2Key: undefined, bgImageUrl: undefined })}>
-                      이미지 제거
-                    </button>
-                  ) : null}
-                  <button className="btn btn-primary text-xs" onClick={() => regenSlideImage(i)} disabled={genIdx !== null}>
-                    {genIdx === i ? "생성 중... (~30s)" : "이미지 생성/재생성"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
-        <button className="btn btn-ghost w-full border border-dashed border-zinc-700 py-3" onClick={addSlide}>+ 슬라이드 추가</button>
-      </div>
+      {/* ─── Slide editor (always shown — orchestrator uses slides[] as outline even for video reels) ─── */}
+      {!isVideoReel ? (
+        <div className="space-y-3">
+          <div className="text-xs uppercase tracking-wider text-zinc-400 font-semibold">슬라이드</div>
+          {(draft.slides ?? []).map((slide, i) => (
+            <SlideEditor
+              key={i}
+              slide={slide}
+              index={i}
+              total={draft.slides?.length ?? 1}
+              genIdx={genIdx}
+              compositionId={compositionId}
+              accent={templateAccent}
+              publicMediaBase={publicMediaBase}
+              onChange={(patch) => setSlide(i, patch)}
+              onMove={(dir) => moveSlide(i, dir)}
+              onRemove={() => removeSlide(i)}
+              onRegen={() => regenSlideImage(i)}
+            />
+          ))}
+          <button className="btn btn-ghost w-full border border-dashed border-zinc-700 py-3" onClick={addSlide}>+ 슬라이드 추가</button>
+        </div>
+      ) : (
+        <ScenesEditor
+          scenes={draft.video?.scenes ?? []}
+          accent={templateAccent}
+          publicMediaBase={publicMediaBase}
+          onChange={(scenes) => setDraft({ ...draft, video: { ...(draft.video ?? {}), scenes } })}
+        />
+      )}
 
       <div className="card space-y-3">
         <h3 className="font-semibold">Threads 카드</h3>
-        <div className="grid grid-cols-[160px_1fr] gap-4">
-          <SlideThumb url={draft.threads?.bgImageUrl} loading={genIdx === -1} accent="#facc15" index={0} total={1} aspect="aspect-[4/5]" />
+        <div className="grid grid-cols-[180px_1fr] gap-4">
+          <ThreadsCardThumb
+            url={draft.threads?.bgImageUrl ?? (draft.threads?.bgImageR2Key ? `${publicMediaBase}/${draft.threads.bgImageR2Key}` : undefined)}
+            loading={genIdx === -1}
+            text={draft.threads?.text ?? ""}
+          />
           <div className="space-y-3">
             <Field label="Text">
               <textarea className="input min-h-20" value={draft.threads?.text ?? ""}
@@ -557,28 +685,404 @@ function StoryboardTab({
   );
 }
 
-function SlideThumb({ url, loading, accent, index, total, aspect = "aspect-[2/3]" }: {
-  url?: string; loading: boolean; accent: string; index: number; total: number; aspect?: string;
+// ─── Per-slide editor with live mini-player ────────────────────────────
+
+function SlideEditor({
+  slide, index, total, genIdx, compositionId, accent, publicMediaBase,
+  onChange, onMove, onRemove, onRegen,
+}: {
+  slide: SlideDraft;
+  index: number;
+  total: number;
+  genIdx: number | null;
+  compositionId: string;
+  accent: string;
+  publicMediaBase: string;
+  onChange: (patch: Partial<SlideDraft>) => void;
+  onMove: (dir: -1 | 1) => void;
+  onRemove: () => void;
+  onRegen: () => void;
 }) {
+  // Compute the [start, end] frame range for this slide so the mini-player
+  // loops on just this single slide's animation. We pass a one-slide
+  // inputProps shadow so the slide gets index 0/1 and reads as the only
+  // visible card — clean preview without the surrounding slides bleeding in.
+  const oneSlideProps = useMemo<Record<string, unknown>>(() => ({
+    brand: { handle: "@yourhandle", name: "Loc" },
+    lang: "ko",
+    slides: [{
+      kicker: slide.kicker,
+      headline: slide.headline ?? "",
+      body: slide.body,
+      emphasis: slide.emphasis,
+      attribution: slide.attribution,
+      stat: slide.stat?.value ? slide.stat : undefined,
+      bgImageUrl: slide.bgImageUrl ?? (slide.bgImageR2Key ? `${publicMediaBase}/${slide.bgImageR2Key}` : undefined),
+    }],
+  }), [slide, publicMediaBase]);
+
+  const loading = genIdx === index;
+
   return (
-    <div
-      className={`relative ${aspect} rounded-xl overflow-hidden border border-zinc-800`}
-      style={{ background: "linear-gradient(135deg, #0a0118 0%, #1a0030 50%, #00121f 100%)" }}
-    >
-      {url ? <img src={url} className="absolute inset-0 w-full h-full object-cover opacity-60" alt="" /> : null}
-      <div className="absolute top-2 left-2 right-2 flex gap-0.5">
-        {Array.from({ length: total }).map((_, i) => (
-          <div key={i} className="h-[2px] flex-1 rounded-full bg-white/20">
-            <div className="h-full" style={{ width: i < index ? "100%" : i === index ? "60%" : "0%", background: accent }} />
+    <div className="card grid grid-cols-[180px_1fr] gap-4">
+      <div className="relative">
+        <LivePlayer
+          compositionId={compositionId}
+          inputProps={oneSlideProps}
+          controls={false}
+          loop
+          autoPlay
+          rounded="rounded-xl"
+        />
+        {loading ? (
+          <div className="absolute inset-0 rounded-xl flex items-center justify-center text-xs bg-black/70 backdrop-blur-sm text-yellow-300 animate-pulse">
+            이미지 생성 중...
           </div>
-        ))}
+        ) : null}
+        <div className="absolute top-2 left-2 right-2 flex gap-0.5 pointer-events-none">
+          {Array.from({ length: total }).map((_, i) => (
+            <div key={i} className="h-[2px] flex-1 rounded-full bg-white/20">
+              <div className="h-full" style={{ width: i === index ? "60%" : "0%", background: accent }} />
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="space-y-3 min-w-0">
+        <div className="flex items-center justify-between">
+          <div className="font-mono text-xs text-zinc-500">slide #{index + 1}</div>
+          <div className="flex gap-1">
+            <button className="btn btn-ghost text-xs" onClick={() => onMove(-1)} disabled={index === 0}>↑</button>
+            <button className="btn btn-ghost text-xs" onClick={() => onMove(1)} disabled={index === total - 1}>↓</button>
+            <button className="btn btn-danger text-xs" onClick={onRemove}>삭제</button>
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          <Field label="Kicker">
+            <input className="input text-sm" value={slide.kicker ?? ""}
+              onChange={(e) => onChange({ kicker: e.target.value })} placeholder="TREND" />
+          </Field>
+          <Field label="Emphasis">
+            <input className="input text-sm" value={slide.emphasis ?? ""}
+              onChange={(e) => onChange({ emphasis: e.target.value })} placeholder="🔖" />
+          </Field>
+          <Field label="bg R2 key" hint="자동으로 채워짐">
+            <input className="input text-xs font-mono" value={slide.bgImageR2Key ?? ""}
+              onChange={(e) => onChange({ bgImageR2Key: e.target.value })} />
+          </Field>
+        </div>
+        <Field label="Headline">
+          <input className="input" value={slide.headline ?? ""}
+            onChange={(e) => onChange({ headline: e.target.value })} />
+        </Field>
+        <Field label="Body">
+          <textarea className="input min-h-20" value={slide.body ?? ""}
+            onChange={(e) => onChange({ body: e.target.value })} />
+        </Field>
+
+        <details className="border-t border-zinc-800 pt-2">
+          <summary className="text-xs text-zinc-400 cursor-pointer">통계 / 인용 (DataStory · NeoBrutalism · QuoteSpotlight)</summary>
+          <div className="grid grid-cols-3 gap-2 mt-2">
+            <Field label="stat 값">
+              <input className="input text-sm" value={slide.stat?.value ?? ""}
+                onChange={(e) => onChange({ stat: { ...(slide.stat ?? {}), value: e.target.value } })}
+                placeholder="73" />
+            </Field>
+            <Field label="stat 단위">
+              <input className="input text-sm" value={slide.stat?.suffix ?? ""}
+                onChange={(e) => onChange({ stat: { ...(slide.stat ?? {}), suffix: e.target.value } })}
+                placeholder="%" />
+            </Field>
+            <Field label="stat 레이블">
+              <input className="input text-sm" value={slide.stat?.label ?? ""}
+                onChange={(e) => onChange({ stat: { ...(slide.stat ?? {}), label: e.target.value } })} />
+            </Field>
+          </div>
+          <Field label="quote 출처 (QuoteSpotlight 전용)">
+            <input className="input text-sm" value={slide.attribution ?? ""}
+              onChange={(e) => onChange({ attribution: e.target.value })}
+              placeholder="— 어떤 작가" />
+          </Field>
+        </details>
+
+        <div className="border-t border-zinc-800 pt-3">
+          <Field label="배경 이미지 프롬프트" hint="topic.imageStylePrompt 가 자동으로 앞에 붙습니다.">
+            <textarea className="input min-h-16 font-mono text-xs" value={slide.bgImagePrompt ?? ""}
+              onChange={(e) => onChange({ bgImagePrompt: e.target.value })}
+              placeholder="bold composition, single focal subject, high contrast..." />
+          </Field>
+          <div className="flex justify-end mt-2 gap-2">
+            {slide.bgImageR2Key ? (
+              <button className="btn btn-ghost text-xs" onClick={() => onChange({ bgImageR2Key: undefined, bgImageUrl: undefined })}>
+                이미지 제거
+              </button>
+            ) : null}
+            <button className="btn btn-primary text-xs" onClick={onRegen} disabled={loading}>
+              {loading ? "생성 중... (~30s)" : "이미지 생성/재생성"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Per-scene editor (reel-video topics) ──────────────────────────────
+
+function ScenesEditor({
+  scenes, accent, publicMediaBase, onChange,
+}: {
+  scenes: SceneDraft[];
+  accent: string;
+  publicMediaBase: string;
+  onChange: (scenes: SceneDraft[]) => void;
+}) {
+  function setScene(i: number, patch: Partial<SceneDraft>) {
+    const next = [...scenes];
+    next[i] = { ...(next[i] ?? {}), ...patch };
+    onChange(next);
+  }
+  function addScene() {
+    onChange([...scenes, { chapter: "SCENE", durationSec: 5, generateAudio: true, aspectRatio: "9:16", resolution: "720p" }]);
+  }
+  function removeScene(i: number) {
+    const next = [...scenes];
+    next.splice(i, 1);
+    onChange(next);
+  }
+  function moveScene(i: number, dir: -1 | 1) {
+    const j = i + dir;
+    if (j < 0 || j >= scenes.length) return;
+    const next = [...scenes];
+    const a = next[i]!;
+    const b = next[j]!;
+    next[i] = b;
+    next[j] = a;
+    onChange(next);
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="text-xs uppercase tracking-wider text-zinc-400 font-semibold flex items-center justify-between">
+        <span>씬 ({scenes.length})</span>
+        <span className="text-zinc-500 normal-case font-normal">총 {scenes.reduce((acc, s) => acc + (s.durationSec ?? 5), 0).toFixed(1)}s</span>
+      </div>
+      {scenes.map((scene, i) => (
+        <SceneEditor
+          key={i}
+          scene={scene}
+          index={i}
+          total={scenes.length}
+          accent={accent}
+          publicMediaBase={publicMediaBase}
+          onChange={(patch) => setScene(i, patch)}
+          onMove={(dir) => moveScene(i, dir)}
+          onRemove={() => removeScene(i)}
+        />
+      ))}
+      <button className="btn btn-ghost w-full border border-dashed border-zinc-700 py-3" onClick={addScene}>+ 씬 추가</button>
+    </div>
+  );
+}
+
+function SceneEditor({
+  scene, index, total, accent, publicMediaBase,
+  onChange, onMove, onRemove,
+}: {
+  scene: SceneDraft;
+  index: number;
+  total: number;
+  accent: string;
+  publicMediaBase: string;
+  onChange: (patch: Partial<SceneDraft>) => void;
+  onMove: (dir: -1 | 1) => void;
+  onRemove: () => void;
+}) {
+  const previewProps = useMemo<Record<string, unknown>>(() => ({
+    brand: { handle: "@yourhandle", name: "Loc" },
+    lang: "ko",
+    accent,
+    scenes: [{
+      kicker: scene.kicker,
+      chapter: scene.chapter,
+      headline: scene.headline,
+      body: scene.body,
+      stat: scene.stat?.value ? { value: scene.stat.value, label: scene.stat.label, suffix: scene.stat.suffix } : undefined,
+      durationSec: scene.durationSec ?? 5,
+      videoUrl: scene.videoR2Key ? `${publicMediaBase}/${scene.videoR2Key}` : undefined,
+    }],
+  }), [scene, accent, publicMediaBase]);
+
+  return (
+    <div className="card grid grid-cols-[200px_1fr] gap-4">
+      <div className="relative">
+        <LivePlayer
+          compositionId="SeedanceReel"
+          inputProps={previewProps}
+          controls={false}
+          loop
+          autoPlay
+          rounded="rounded-xl"
+        />
+        {!scene.videoR2Key ? (
+          <div className="absolute bottom-2 left-2 right-2 text-[10px] text-center bg-black/60 backdrop-blur-sm rounded px-2 py-1 text-zinc-300">
+            영상은 런타임 생성
+          </div>
+        ) : null}
+        <div className="absolute top-2 left-2 right-2 flex gap-0.5 pointer-events-none">
+          {Array.from({ length: total }).map((_, i) => (
+            <div key={i} className="h-[2px] flex-1 rounded-full bg-white/20">
+              <div className="h-full" style={{ width: i === index ? "60%" : "0%", background: accent }} />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-3 min-w-0">
+        <div className="flex items-center justify-between">
+          <div className="font-mono text-xs text-zinc-500">scene #{index + 1}</div>
+          <div className="flex gap-1">
+            <button className="btn btn-ghost text-xs" onClick={() => onMove(-1)} disabled={index === 0}>↑</button>
+            <button className="btn btn-ghost text-xs" onClick={() => onMove(1)} disabled={index === total - 1}>↓</button>
+            <button className="btn btn-danger text-xs" onClick={onRemove}>삭제</button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="Chapter" hint="좌상단 라벨, 예: OPENING / SHIFT / ACTION">
+            <input className="input text-sm" value={scene.chapter ?? ""}
+              onChange={(e) => onChange({ chapter: e.target.value })} placeholder="OPENING" />
+          </Field>
+          <Field label="Kicker" hint="chapter가 없을 때 fallback">
+            <input className="input text-sm" value={scene.kicker ?? ""}
+              onChange={(e) => onChange({ kicker: e.target.value })} placeholder="TRENDING" />
+          </Field>
+        </div>
+        <Field label="Headline" hint="화면 하단 큰 문구. ≤14자 (KO) / ≤22자 (EN)">
+          <input className="input" value={scene.headline ?? ""}
+            onChange={(e) => onChange({ headline: e.target.value })} />
+        </Field>
+        <Field label="Body" hint="hairline 아래 보조 라인">
+          <textarea className="input min-h-16" value={scene.body ?? ""}
+            onChange={(e) => onChange({ body: e.target.value })} />
+        </Field>
+
+        <details>
+          <summary className="text-xs text-zinc-400 cursor-pointer">통계 카드 (오른쪽 글래스 카드)</summary>
+          <div className="grid grid-cols-3 gap-2 mt-2">
+            <Field label="값">
+              <input className="input text-sm" value={scene.stat?.value ?? ""}
+                onChange={(e) => onChange({ stat: { ...(scene.stat ?? {}), value: e.target.value } })} placeholder="73" />
+            </Field>
+            <Field label="단위">
+              <input className="input text-sm" value={scene.stat?.suffix ?? ""}
+                onChange={(e) => onChange({ stat: { ...(scene.stat ?? {}), suffix: e.target.value } })} placeholder="%" />
+            </Field>
+            <Field label="레이블">
+              <input className="input text-sm" value={scene.stat?.label ?? ""}
+                onChange={(e) => onChange({ stat: { ...(scene.stat ?? {}), label: e.target.value } })} />
+            </Field>
+          </div>
+        </details>
+
+        <div className="border-t border-zinc-800 pt-3 space-y-3">
+          <Field label="Seedance 영상 prompt" hint="subject + action + camera + lighting + style 5단계로 작성. 대사는 큰따옴표.">
+            <textarea className="input min-h-24 font-mono text-xs" value={scene.videoPrompt ?? ""}
+              onChange={(e) => onChange({ videoPrompt: e.target.value })}
+              placeholder="A young office worker freezes mid-sentence, eyes widening, slow dolly in, blue-hour overcast light, cinematic 35mm shallow depth of field." />
+          </Field>
+
+          <div className="grid grid-cols-4 gap-2">
+            <Field label="Duration (초)" hint="3-12 또는 -1=adaptive">
+              <input className="input text-sm" type="number" min={-1} max={12}
+                value={scene.durationSec ?? 5}
+                onChange={(e) => onChange({ durationSec: Number(e.target.value) })} />
+            </Field>
+            <Field label="Aspect">
+              <select className="input text-sm" value={scene.aspectRatio ?? "9:16"}
+                onChange={(e) => onChange({ aspectRatio: e.target.value as SceneDraft["aspectRatio"] })}>
+                {["9:16", "1:1", "16:9", "3:4", "4:3", "21:9", "adaptive"].map((a) => <option key={a} value={a}>{a}</option>)}
+              </select>
+            </Field>
+            <Field label="Resolution">
+              <select className="input text-sm" value={scene.resolution ?? "720p"}
+                onChange={(e) => onChange({ resolution: e.target.value as SceneDraft["resolution"] })}>
+                <option value="720p">720p</option>
+                <option value="480p">480p</option>
+              </select>
+            </Field>
+            <Field label="Seed" hint="재현 가능한 출력. 비우면 랜덤.">
+              <input className="input text-sm" type="number"
+                value={scene.seed ?? ""}
+                onChange={(e) => onChange({ seed: e.target.value === "" ? undefined : Number(e.target.value) })} />
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            <Field label="카메라 무브">
+              <input className="input text-sm" value={scene.cameraMove ?? ""}
+                onChange={(e) => onChange({ cameraMove: e.target.value })} placeholder="slow dolly in" />
+            </Field>
+            <Field label="Mood">
+              <input className="input text-sm" value={scene.mood ?? ""}
+                onChange={(e) => onChange({ mood: e.target.value })} placeholder="golden hour, soft daylight" />
+            </Field>
+            <Field label="음성+효과음">
+              <label className="input flex items-center gap-2 text-sm cursor-pointer">
+                <input type="checkbox" checked={scene.generateAudio ?? true}
+                  onChange={(e) => onChange({ generateAudio: e.target.checked })} />
+                <span>{scene.generateAudio !== false ? "ON (Seedance 자체 오디오)" : "OFF (BGM만)"}</span>
+              </label>
+            </Field>
+          </div>
+
+          <details>
+            <summary className="text-xs text-zinc-400 cursor-pointer">고급: 첫/끝 프레임 이미지 prompt (gpt-image-2)</summary>
+            <div className="space-y-2 mt-2">
+              <Field label="첫 프레임 prompt" hint="설정 시 image-to-video 모드로 전환. 캐릭터/색감 일관성 확보.">
+                <textarea className="input min-h-14 font-mono text-xs" value={scene.firstFrameImagePrompt ?? ""}
+                  onChange={(e) => onChange({ firstFrameImagePrompt: e.target.value })} />
+              </Field>
+              <Field label="끝 프레임 prompt" hint="첫 프레임이 있을 때만 효과. 컨트롤된 컷 효과.">
+                <textarea className="input min-h-14 font-mono text-xs" value={scene.lastFrameImagePrompt ?? ""}
+                  onChange={(e) => onChange({ lastFrameImagePrompt: e.target.value })} />
+              </Field>
+            </div>
+          </details>
+
+          {scene.videoR2Key ? (
+            <div className="text-xs text-emerald-400 flex items-center gap-2">
+              <span>✓ 생성된 영상: <code className="text-zinc-300 break-all">{scene.videoR2Key}</code></span>
+              <button className="btn btn-ghost text-xs" onClick={() => onChange({ videoR2Key: undefined })}>제거</button>
+            </div>
+          ) : (
+            <div className="text-xs text-zinc-500">
+              영상은 다음 실행 때 orchestrate-run 스킬이 위 파라미터로 <code className="text-zinc-300">bytedance/seedance-2.0</code>을 호출해 생성합니다.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Static still preview for the Threads card. We don't run the full
+// ThreadsCard composition here (its native is 1080×1350 still — Player
+// would render a single frame anyway), so a CSS approximation is plenty.
+function ThreadsCardThumb({ url, loading, text }: { url?: string; loading: boolean; text: string }) {
+  return (
+    <div className="relative aspect-[4/5] rounded-xl overflow-hidden border border-zinc-800"
+      style={{ background: "linear-gradient(135deg, #0a0118 0%, #1a0030 50%, #00121f 100%)" }}>
+      {url ? <img src={url} className="absolute inset-0 w-full h-full object-cover opacity-60" alt="" /> : null}
+      <div className="absolute inset-0 p-3 flex flex-col justify-end text-xs">
+        <div className="text-white/90 line-clamp-4 font-medium leading-tight whitespace-pre-line">
+          {text || "(텍스트 입력)"}
+        </div>
       </div>
       {loading ? (
-        <div className="absolute inset-0 flex items-center justify-center text-xs bg-black/60 backdrop-blur-sm text-yellow-300 animate-pulse">생성 중...</div>
+        <div className="absolute inset-0 flex items-center justify-center text-xs bg-black/70 backdrop-blur-sm text-yellow-300 animate-pulse">
+          이미지 생성 중...
+        </div>
       ) : null}
-      <div className="absolute bottom-1.5 left-1.5 text-[9px] tracking-widest text-zinc-300/80">
-        {String(index + 1).padStart(2, "0")} / {String(total).padStart(2, "0")}
-      </div>
     </div>
   );
 }
@@ -593,12 +1097,23 @@ function defaultSlides(): SlideDraft[] {
   ];
 }
 
+function defaultScenes(): SceneDraft[] {
+  return [
+    { chapter: "OPENING", kicker: "TRENDING", headline: "여기서부터 보세요", body: "12초 안에 핵심을 다 보여드립니다.", durationSec: 5, aspectRatio: "9:16", resolution: "720p", generateAudio: true },
+    { chapter: "INSIGHT", headline: "왜 지금이냐면", body: "트렌드의 첫 6주가 가장 빠르다.", stat: { value: "73", suffix: "%", label: "초기 진입자 우위" }, durationSec: 6, aspectRatio: "9:16", resolution: "720p", generateAudio: true },
+    { chapter: "SHIFT", headline: "핵심 변화 한 가지", body: "익숙했던 기준이 더는 통하지 않는 영역.", durationSec: 5, aspectRatio: "9:16", resolution: "720p", generateAudio: true },
+    { chapter: "ACTION", headline: "오늘 시도해 볼 것", body: "1분이면 됩니다.", durationSec: 4, aspectRatio: "9:16", resolution: "720p", generateAudio: true },
+    { chapter: "CLOSING", headline: "저장하고 다시 보기", durationSec: 3, aspectRatio: "9:16", resolution: "720p", generateAudio: true },
+  ];
+}
+
 function briefShape(brief: unknown): DraftBrief {
   if (!brief || typeof brief !== "object") return { slides: defaultSlides() };
   const b = brief as DraftBrief & Record<string, unknown>;
   return {
     topic: b.topic,
     slides: Array.isArray(b.slides) ? b.slides : defaultSlides(),
+    video: b.video && typeof b.video === "object" ? b.video : undefined,
     threads: b.threads,
     caption: b.caption,
     hashtags: b.hashtags,

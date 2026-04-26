@@ -1,6 +1,6 @@
 ---
 name: render-reel
-description: Render the brief into a 1080x1920 H.264 MP4 using Remotion, mux BGM, upload to R2. Use after content-plan and gemini-image are done and audio is selected.
+description: Render the brief into a 1080x1920 H.264 MP4 using Remotion, mux BGM, upload to R2. Use after content-plan and image-gen (and video-gen, for reel-video templates) are done and audio is selected.
 allowed-tools: Bash
 ---
 

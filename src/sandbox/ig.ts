@@ -1,11 +1,13 @@
-// ig.ts — Instagram Reels publishing via Graph API v25.0.
+// ig.ts — Instagram Reels publishing via Graph API v25.0 (Instagram Login).
 //
 // CLI:
 //   bun src/sandbox/ig.ts publish-reel \
 //     --run-id <runId> \
 //     --video-r2-key runs/<runId>/reel.mp4 \
 //     --cover-r2-key runs/<runId>/cover.jpg \
-//     --caption "..." \
+//     --caption-body "..." \
+//     --hashtags "tag1,tag2" \
+//     [--attribution "..."] \
 //     --lang ko
 //
 // Reads IG_USER_ID, IG_ACCOUNT_ID, IG_ACCESS_TOKEN, R2_PUBLIC_BASE from env.
@@ -14,16 +16,25 @@
 import { api } from "./lib/api";
 import { publicUrl } from "./upload";
 
-const GRAPH = "https://graph.instagram.com/v23.0";
+const GRAPH = "https://graph.instagram.com/v25.0";
+
+// Meta hard limits — fail loudly rather than truncating silently.
+const IG_CAPTION_MAX = 2200;
+const IG_HASHTAG_MAX = 30;
 
 interface Args {
   runId: string;
   videoR2Key: string;
   coverR2Key?: string;
-  caption: string;
+  // Body (no hashtags). Hashtags arrive separately so we can sanitize, dedupe,
+  // and clamp to Meta's per-post limits.
+  captionBody: string;
+  hashtags: string[];
+  attribution?: string;
   lang: "ko" | "en";
   templateSlug?: string;
   audioTrackId?: string;
+  shareToFeed: boolean;
 }
 
 function parseArgs(argv: string[]): Args {
@@ -35,11 +46,40 @@ function parseArgs(argv: string[]): Args {
     runId: m.get("run-id") ?? "",
     videoR2Key: m.get("video-r2-key") ?? "",
     coverR2Key: m.get("cover-r2-key"),
-    caption: m.get("caption") ?? "",
+    captionBody: m.get("caption-body") ?? m.get("caption") ?? "",
+    hashtags: parseTagList(m.get("hashtags")),
+    attribution: m.get("attribution") || undefined,
     lang: (m.get("lang") ?? "ko") as "ko" | "en",
     templateSlug: m.get("template-slug"),
     audioTrackId: m.get("audio-track-id"),
+    shareToFeed: m.get("share-to-feed") !== "false",
   };
+}
+
+function parseTagList(raw: string | undefined): string[] {
+  if (!raw) return [];
+  return raw
+    .split(/[\s,]+/)
+    .map((s) => s.trim().replace(/^#+/, ""))
+    .filter(Boolean);
+}
+
+function composeCaption(args: Args): string {
+  const tags = dedupe(args.hashtags).slice(0, IG_HASHTAG_MAX);
+  const tagLine = tags.length ? tags.map((t) => `#${t}`).join(" ") : "";
+  const parts = [args.captionBody.trim()];
+  if (args.attribution) parts.push(`🎵 Music: ${args.attribution}`);
+  if (tagLine) parts.push(tagLine);
+  let caption = parts.filter(Boolean).join("\n\n");
+  if (caption.length > IG_CAPTION_MAX) {
+    // Drop tags first, then truncate body.
+    caption = parts.slice(0, -1).filter(Boolean).join("\n\n").slice(0, IG_CAPTION_MAX);
+  }
+  return caption;
+}
+
+function dedupe<T>(xs: T[]): T[] {
+  return Array.from(new Set(xs));
 }
 
 async function publishReel(args: Args): Promise<void> {
@@ -50,6 +90,7 @@ async function publishReel(args: Args): Promise<void> {
     throw new Error("missing IG_USER_ID / IG_ACCOUNT_ID / IG_ACCESS_TOKEN");
   }
 
+  const caption = composeCaption(args);
   const videoUrl = publicUrl(args.videoR2Key);
   const coverUrl = args.coverR2Key ? publicUrl(args.coverR2Key) : undefined;
 
@@ -59,7 +100,7 @@ async function publishReel(args: Args): Promise<void> {
     templateSlug: args.templateSlug,
     platform: "instagram",
     mediaType: "reel",
-    caption: args.caption,
+    caption,
     lang: args.lang,
     assetKeys: [args.videoR2Key, ...(args.coverR2Key ? [args.coverR2Key] : [])],
     audioTrackId: args.audioTrackId,
@@ -69,8 +110,8 @@ async function publishReel(args: Args): Promise<void> {
     const params = new URLSearchParams({
       media_type: "REELS",
       video_url: videoUrl,
-      caption: args.caption,
-      share_to_feed: "true",
+      caption,
+      share_to_feed: args.shareToFeed ? "true" : "false",
       access_token: token,
     });
     if (coverUrl) params.set("cover_url", coverUrl);
@@ -107,16 +148,26 @@ async function publishReel(args: Args): Promise<void> {
   }
 }
 
+interface ContainerStatus {
+  status_code: "IN_PROGRESS" | "FINISHED" | "ERROR" | "EXPIRED" | "PUBLISHED";
+  status?: string;
+  error_message?: string;
+}
+
 async function pollContainer(creationId: string, token: string): Promise<void> {
   const deadline = Date.now() + 5 * 60 * 1000;
   let delay = 4000;
   while (Date.now() < deadline) {
     const status = await fetch(
-      `${GRAPH}/${creationId}?fields=status_code&access_token=${token}`,
-    ).then(jsonOrThrow) as { status_code: string };
+      `${GRAPH}/${creationId}?fields=status_code,status,error_message&access_token=${token}`,
+    ).then(jsonOrThrow) as ContainerStatus;
     if (status.status_code === "FINISHED") return;
     if (status.status_code === "ERROR" || status.status_code === "EXPIRED") {
-      throw new Error(`IG container ${creationId} status=${status.status_code}`);
+      throw new Error(
+        `IG container ${creationId} status=${status.status_code}` +
+        (status.error_message ? ` — ${status.error_message}` : "") +
+        (status.status ? ` (${status.status})` : ""),
+      );
     }
     await new Promise((r) => setTimeout(r, delay));
     delay = Math.min(delay * 1.4, 20000);
@@ -139,6 +190,11 @@ if (cmd === "publish-reel") {
     process.exit(1);
   });
 } else {
-  console.error("usage: bun src/sandbox/ig.ts publish-reel --run-id ... --video-r2-key ... --caption ... --lang ko [--audio-track-id ...] [--template-slug ...] [--cover-r2-key ...]");
+  console.error(
+    "usage: bun src/sandbox/ig.ts publish-reel " +
+    "--run-id ... --video-r2-key ... --caption-body \"...\" --hashtags \"a,b,c\" --lang ko " +
+    "[--attribution \"...\"] [--audio-track-id ...] [--template-slug ...] [--cover-r2-key ...] " +
+    "[--share-to-feed false]",
+  );
   process.exit(2);
 }

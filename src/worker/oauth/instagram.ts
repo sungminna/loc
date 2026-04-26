@@ -122,7 +122,7 @@ export async function igCallback(req: Request, env: Env): Promise<Response> {
 
     // Step 3: profile lookup
     const profileRes = await fetch(
-      `https://graph.instagram.com/v23.0/me?fields=id,username&access_token=${longLived.access_token}`,
+      `https://graph.instagram.com/v25.0/me?fields=id,username&access_token=${longLived.access_token}`,
     );
     const profileText = await profileRes.text();
     if (!profileRes.ok) throw new Error(`profile: ${profileRes.status} ${profileText.slice(0, 300)}`);

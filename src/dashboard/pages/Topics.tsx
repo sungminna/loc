@@ -20,6 +20,10 @@ interface TopicForm {
   dailyRunCap: number;
   costCapUsd: number;
   enabled: boolean;
+  imageMode: "ai-all" | "ai-first-only" | "template-only";
+  threadsFormat: "text" | "image";
+  hashtagMode: "ai" | "fixed" | "mixed";
+  fixedHashtags: string[];
 }
 
 const DEFAULT: TopicForm = {
@@ -35,6 +39,10 @@ const DEFAULT: TopicForm = {
   dailyRunCap: 1,
   costCapUsd: 5,
   enabled: true,
+  imageMode: "ai-all",
+  threadsFormat: "image",
+  hashtagMode: "ai",
+  fixedHashtags: [],
 };
 
 export function Topics() {
@@ -210,6 +218,43 @@ function TopicEditor({ form, setForm, accounts, templates }: {
         <input className="input" value={(form.audioPrefs.moodTags ?? []).join(", ")}
           onChange={(e) => setForm({ ...form, audioPrefs: { ...form.audioPrefs, moodTags: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) } })} />
       </Field>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="이미지 자동화" hint="AI가 슬라이드 배경을 얼마나 자율적으로 만들지">
+          <select className="input" value={form.imageMode}
+            onChange={(e) => setForm({ ...form, imageMode: e.target.value as TopicForm["imageMode"] })}>
+            <option value="ai-all">AI 전체 자동 생성</option>
+            <option value="ai-first-only">첫 슬라이드만 AI · 나머지 템플릿</option>
+            <option value="template-only">템플릿 기본 이미지만 사용</option>
+          </select>
+        </Field>
+        <Field label="Threads 포맷" hint="text = 글만, image = ThreadsCard 이미지+글">
+          <select className="input" value={form.threadsFormat}
+            onChange={(e) => setForm({ ...form, threadsFormat: e.target.value as TopicForm["threadsFormat"] })}>
+            <option value="image">이미지 + 글</option>
+            <option value="text">글만</option>
+          </select>
+        </Field>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="해시태그 모드" hint="ai = AI가 매번 생성. fixed = 고정 태그만. mixed = 둘 다 합쳐서.">
+          <select className="input" value={form.hashtagMode}
+            onChange={(e) => setForm({ ...form, hashtagMode: e.target.value as TopicForm["hashtagMode"] })}>
+            <option value="ai">AI 자동 생성</option>
+            <option value="fixed">고정만</option>
+            <option value="mixed">AI + 고정 합쳐서</option>
+          </select>
+        </Field>
+        <Field label="고정 해시태그" hint="공백/콤마 구분. # 자동 제거. fixed/mixed 모드에서 사용.">
+          <input className="input" value={form.fixedHashtags.join(" ")}
+            onChange={(e) => setForm({
+              ...form,
+              fixedHashtags: e.target.value.split(/[\s,]+/).map((s) => s.replace(/^#+/, "")).filter(Boolean).slice(0, 30),
+            })} />
+        </Field>
+      </div>
+
       <div className="grid grid-cols-3 gap-3">
         <Field label="일일 실행 상한" hint="회 / 24h">
           <input className="input" type="number" min={1} max={20} value={form.dailyRunCap}
@@ -236,7 +281,25 @@ function safeCron(s: string): string {
 function cronError(s: string): string | undefined {
   try { cronstrue.toString(s); return undefined; } catch { return "잘못된 cron 표현식"; }
 }
-function toForm(t: { id: string; name: string; description?: string | null; lang: "ko" | "en" | "ko+en"; personaPrompt: string; sourceUrls: string[]; targetAccounts: { instagram?: string; threads?: string }; templateSlugs: string[]; audioPrefs: TopicForm["audioPrefs"]; cron: string; dailyRunCap: number; costCapUsd: number; enabled: boolean }): TopicForm {
+function toForm(t: {
+  id: string;
+  name: string;
+  description?: string | null;
+  lang: "ko" | "en" | "ko+en";
+  personaPrompt: string;
+  sourceUrls: string[];
+  targetAccounts: { instagram?: string; threads?: string };
+  templateSlugs: string[];
+  audioPrefs: TopicForm["audioPrefs"];
+  cron: string;
+  dailyRunCap: number;
+  costCapUsd: number;
+  enabled: boolean;
+  imageMode?: TopicForm["imageMode"];
+  threadsFormat?: TopicForm["threadsFormat"];
+  hashtagMode?: TopicForm["hashtagMode"];
+  fixedHashtags?: string[];
+}): TopicForm {
   return {
     name: t.name,
     description: t.description ?? "",
@@ -250,6 +313,10 @@ function toForm(t: { id: string; name: string; description?: string | null; lang
     dailyRunCap: t.dailyRunCap,
     costCapUsd: t.costCapUsd,
     enabled: t.enabled,
+    imageMode: t.imageMode ?? "ai-all",
+    threadsFormat: t.threadsFormat ?? "image",
+    hashtagMode: t.hashtagMode ?? "ai",
+    fixedHashtags: t.fixedHashtags ?? [],
   };
 }
 

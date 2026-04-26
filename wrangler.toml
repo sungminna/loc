@@ -74,7 +74,7 @@ AI_GATEWAY_BASE = ""
 
 # ── Secrets (set via `wrangler secret put` for production;
 #    .dev.vars for local dev) ────────────────────────────────────────
-# CLAUDE_CODE_OAUTH_TOKEN, LOC_MASTER_KEY, GEMINI_API_KEY,
+# CLAUDE_CODE_OAUTH_TOKEN, LOC_MASTER_KEY, REPLICATE_API_TOKEN,
 # R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, INTERNAL_API_KEY,
 # META_APP_ID, META_APP_SECRET, THREADS_APP_ID, THREADS_APP_SECRET,
 # GITHUB_REPO_URL, DEV_USER_EMAIL

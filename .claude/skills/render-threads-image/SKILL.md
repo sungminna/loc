@@ -1,6 +1,6 @@
 ---
 name: render-threads-image
-description: Render a single 1080x1350 (4:5) JPG for Threads using the ThreadsCard composition. Use after gemini-image has produced the threads bg.
+description: Render a single 1080x1350 (4:5) JPG for Threads using the ThreadsCard composition. Use after image-gen has produced the threads bg.
 allowed-tools: Bash
 ---
 

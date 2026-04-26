@@ -1,6 +1,6 @@
 # Cloudflare Sandbox base image — ships the sandbox server on port 3000.
 # Pin tag to match the @cloudflare/sandbox version in package.json.
-FROM docker.io/cloudflare/sandbox:0.4.18
+FROM docker.io/cloudflare/sandbox:0.9.0
 
 ENV DEBIAN_FRONTEND=noninteractive
 

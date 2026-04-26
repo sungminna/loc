@@ -1,7 +1,7 @@
 # loc — 자율 Instagram + Threads 포스팅 시스템
 
 Cloudflare Workers + Sandbox + Claude Code CLI 기반의 자율 콘텐츠 봇.
-매분 cron이 due 토픽을 발견 → Cloudflare Queue에 enqueue → Sandbox 컨테이너에서 `claude` 헤드리스 실행 → `.claude/skills/*` 워크플로(리서치 → 기획 → Gemini 이미지 → Remotion 릴스 → IG/Threads 게시)를 자동 수행.
+매분 cron이 due 토픽을 발견 → Cloudflare Queue에 enqueue → Sandbox 컨테이너에서 `claude` 헤드리스 실행 → `.claude/skills/*` 워크플로(리서치 → 기획 → 이미지(`openai/gpt-image-2`) / 영상(`bytedance/seedance-2.0`) → Remotion 릴스 → IG/Threads 게시)를 자동 수행.
 
 ## Architecture
 
@@ -20,7 +20,10 @@ Cloudflare Queues (loc-runs)
                           --permission-mode bypassPermissions")
                      │
                      └── Skill flow (in-sandbox):
-                          topic-research → content-plan → gemini-image (Nano Banana)
+                          topic-research → content-plan
+                          [→ video-storyboard, for reel-video templates]
+                          → image-gen (Replicate · openai/gpt-image-2)
+                          [→ video-gen (Replicate · bytedance/seedance-2.0), for reel-video]
                           → select-audio (NCS) → render-reel (Remotion 1080×1920 H.264)
                           → render-threads-image → ig-publish-reel → threads-publish
 
@@ -38,14 +41,14 @@ DOs: TopicRunner (락) · Sandbox (Containers SDK)
 | 런타임 | Cloudflare Workers + Containers (Sandbox SDK) |
 | 언어 | TypeScript (strict, noUncheckedIndexedAccess) |
 | Wrangler | v4.x (Containers 정식 지원) |
-| Sandbox | `@cloudflare/sandbox@0.4.18` + 베이스 이미지 `docker.io/cloudflare/sandbox:0.4.18` |
+| Sandbox | `@cloudflare/sandbox@0.9.0` + 베이스 이미지 `docker.io/cloudflare/sandbox:0.9.0` |
 | 컨테이너 | EXPOSE 3000 (Sandbox 서버), `instance_type = "standard-1"`, `max_instances = 5` |
 | DB | D1 + Drizzle ORM |
 | 객체 저장 | R2 (S3 SDK from sandbox) + 커스텀 도메인 공개 URL |
 | 큐 | Cloudflare Queues (재시도/DLQ) |
 | 동시성 락 | Durable Objects (`TopicRunner`) |
 | 인증 | Cloudflare Access (Zero Trust) → `Cf-Access-Authenticated-User-Email` |
-| AI | `claude-code` CLI inside sandbox (OAuth) · `gemini-2.5-flash-image` (Nano Banana) via `@google/genai` |
+| AI | `claude-code` CLI inside sandbox (OAuth) · `openai/gpt-image-2` (Replicate) for images · `bytedance/seedance-2.0` (Replicate) for video |
 | 비디오 | Remotion 4.x (`@remotion/bundler` + `@remotion/renderer`) |
 | 대시보드 | Vite + React 19 + Tailwind 3 + tRPC v11 + superjson |
 
@@ -57,7 +60,7 @@ DOs: TopicRunner (락) · Sandbox (Containers SDK)
 4. Meta 개발자 앱 (Instagram + Threads 제품 모두 추가)
 5. Instagram Business 계정 + 연결된 Facebook Page (Reels 게시는 Business 필수)
 6. Threads 계정
-7. Google AI Studio API Key (Gemini)
+7. Replicate API Token (`r8_...`) — for image + video generation
 8. Claude Code OAuth 토큰 (`/login` → Settings → OAuth)
 9. GitHub 비공개 리포 (sandbox가 매 실행 git clone)
 
@@ -73,7 +76,7 @@ DEV_USER_EMAIL=you@example.com         # 로컬에서 자동 프로비저닝될 
 CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-...
 LOC_MASTER_KEY=$(openssl rand -base64 32)
 INTERNAL_API_KEY=$(openssl rand -hex 32)
-GEMINI_API_KEY=...
+REPLICATE_API_TOKEN=r8_...
 META_APP_ID=...
 META_APP_SECRET=...
 THREADS_APP_ID=...
@@ -161,7 +164,9 @@ FOR_USER_EMAIL=you@example.com \
 | orchestrate-run | 한 사이클 컨덕터 (research → publish 전체) |
 | topic-research | 소스 URL 스크레이핑 + 트렌드 요약 |
 | content-plan | brief.json (슬라이드/카피/이미지 프롬프트) 생성 |
-| gemini-image | Nano Banana로 9:16 / 4:5 이미지 생성 |
+| image-gen | Replicate `openai/gpt-image-2`로 9:16 / 4:5 이미지 생성 |
+| video-storyboard | reel-video 템플릿용 Seedance 2.0 씬 스토리보드 작성 |
+| video-gen | Replicate `bytedance/seedance-2.0`로 씬당 영상 생성 |
 | select-audio | 토픽 mood + 템플릿 mood로 NCS 트랙 1곡 선정 |
 | render-reel | Remotion → 1080×1920 H.264 MP4 + ffmpeg +faststart |
 | render-threads-image | 1080×1350 단일 프레임 JPG |
@@ -201,7 +206,7 @@ Sandbox는 매 실행마다 git clone하므로 커밋 후 즉시 적용됩니다
 |---|---|
 | `containers should be an object, but got an array` | wrangler v3.x. `bun add -d wrangler@^4`로 v4 업그레이드 |
 | `instance_type "standard"` 경고 | `standard-1`로 변경 (wrangler 4.85+) |
-| `container does not expose any ports` | 우리 Dockerfile이 `cloudflare/sandbox` 베이스를 안 씀. `FROM docker.io/cloudflare/sandbox:0.4.18` 확인 |
+| `container does not expose any ports` | 우리 Dockerfile이 `cloudflare/sandbox` 베이스를 안 씀. `FROM docker.io/cloudflare/sandbox:0.9.0` 확인 |
 | `assets.directory does not exist` | 먼저 `bun run dashboard:build` |
 | Sandbox 안에서 `claude: command not found` | Dockerfile에서 `npm install -g @anthropic-ai/claude-code` 했는지 확인 |
 | `Cf-Access-Authenticated-User-Email` 없음 | 로컬 dev면 `.dev.vars`에 `DEV_USER_EMAIL=...` 추가 |

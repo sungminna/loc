@@ -45,33 +45,44 @@ function parseArgs(argv: string[]): Args {
   };
 }
 
-interface Brief {
+interface CardBrief {
   brand: { handle: string; name: string };
   lang: "ko" | "en";
-  reel: {
-    slides: Array<{ kicker?: string; headline: string; body?: string; emphasis?: string; bgImageR2Key?: string }>;
+  reel?: {
+    slides: Array<{ kicker?: string; headline: string; body?: string; emphasis?: string; bgImageR2Key?: string;
+      attribution?: string; stat?: { value: string; label?: string; suffix?: string } }>;
+  };
+  // Video reel (SeedanceReel composition)
+  video?: {
+    scenes: Array<{
+      kicker?: string;
+      chapter?: string;
+      headline?: string;
+      body?: string;
+      stat?: { value: string; label?: string; suffix?: string };
+      durationSec?: number;
+      videoR2Key?: string;
+    }>;
+    accent?: string;
   };
 }
+
+const VIDEO_COMPOSITIONS = new Set(["SeedanceReel"]);
 
 async function main(args: Args): Promise<void> {
   if (!args.runId) throw new Error("--run-id required");
   mkdirSync(args.outDir, { recursive: true });
 
-  const brief = JSON.parse(readFileSync(args.briefPath, "utf8")) as Brief;
+  const brief = JSON.parse(readFileSync(args.briefPath, "utf8")) as CardBrief;
+  const isVideo = VIDEO_COMPOSITIONS.has(args.composition);
 
-  const inputProps = {
-    brand: brief.brand,
-    lang: brief.lang,
-    slides: brief.reel.slides.map((s) => ({
-      kicker: s.kicker,
-      headline: s.headline,
-      body: s.body,
-      emphasis: s.emphasis,
-      bgImageUrl: s.bgImageR2Key ? `${process.env.R2_PUBLIC_BASE}/${s.bgImageR2Key}` : undefined,
-    })),
-    audioUrl: args.audioUrl,
-    attribution: args.audioAttribution,
-  };
+  const inputProps = isVideo
+    ? buildVideoProps(brief, args)
+    : buildCardProps(brief, args);
+
+  if (isVideo && (!brief.video?.scenes?.length)) {
+    throw new Error(`composition ${args.composition} requires brief.video.scenes[]`);
+  }
 
   const serveUrl = await bundle({
     entryPoint: "src/remotion/Root.tsx",
@@ -146,6 +157,46 @@ async function main(args: Args): Promise<void> {
     reel: { r2Key: reelKey, url: reelUp.url, assetId: reelAsset.asset.id },
     cover: { r2Key: coverKey, url: coverUp.url, assetId: coverAsset.asset.id },
   }));
+}
+
+function buildCardProps(brief: CardBrief, args: Args) {
+  const slides = brief.reel?.slides ?? [];
+  return {
+    brand: brief.brand,
+    lang: brief.lang,
+    slides: slides.map((s) => ({
+      kicker: s.kicker,
+      headline: s.headline,
+      body: s.body,
+      emphasis: s.emphasis,
+      attribution: s.attribution,
+      stat: s.stat,
+      bgImageUrl: s.bgImageR2Key ? `${process.env.R2_PUBLIC_BASE}/${s.bgImageR2Key}` : undefined,
+    })),
+    audioUrl: args.audioUrl,
+    attribution: args.audioAttribution,
+  };
+}
+
+function buildVideoProps(brief: CardBrief, args: Args) {
+  const scenes = brief.video?.scenes ?? [];
+  return {
+    brand: brief.brand,
+    lang: brief.lang,
+    accent: brief.video?.accent,
+    scenes: scenes.map((s) => ({
+      kicker: s.kicker,
+      chapter: s.chapter,
+      headline: s.headline,
+      body: s.body,
+      stat: s.stat,
+      durationSec: s.durationSec,
+      videoR2Key: s.videoR2Key,
+      videoUrl: s.videoR2Key ? `${process.env.R2_PUBLIC_BASE}/${s.videoR2Key}` : undefined,
+    })),
+    audioUrl: args.audioUrl,
+    attribution: args.audioAttribution,
+  };
 }
 
 main(parseArgs(process.argv.slice(2))).catch((e) => {

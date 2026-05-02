@@ -7,8 +7,12 @@ import { Field } from "../components/Field";
 import { LivePlayer } from "../components/LivePlayer";
 import { getComposition } from "../components/composition-registry";
 
-const TRANSITIONS = ["fade", "slide-up", "zoom", "kenburns", "none"] as const;
-type Transition = (typeof TRANSITIONS)[number];
+// Kept on the form state so we round-trip the DB column unchanged. The
+// select-control is intentionally not rendered — none of the compositions
+// read transitionPreset; motion is baked into each composition's spring +
+// maskWipe envelope. Removing the UI prevents users from setting a value
+// that has no effect.
+type Transition = "fade" | "slide-up" | "zoom" | "kenburns" | "none";
 
 interface Form {
   name: string;
@@ -47,6 +51,10 @@ function TemplateDetailInner({ id }: { id: string }) {
     onSuccess: (row) => { utils.templates.list.invalidate(); if (row?.id) navigate(`/templates/${row.id}`); },
     onError: (e) => toast({ tone: "err", msg: e.message }),
   });
+  const previewBg = trpc.templates.previewBg.useMutation({
+    onSuccess: () => { utils.templates.get.invalidate({ id }); utils.templates.list.invalidate(); toast({ tone: "ok", msg: "배경 샘플 생성됨" }); },
+    onError: (e) => toast({ tone: "err", msg: e.message }),
+  });
 
   const [form, setForm] = useState<Form | null>(null);
 
@@ -74,6 +82,8 @@ function TemplateDetailInner({ id }: { id: string }) {
   const tpl = detail.data.template;
   const isShared = detail.data.isShared;
   const entry = getComposition(tpl.compositionId);
+  const publicMediaBase = detail.data.publicMediaBase;
+  const previewBgUrl = tpl.previewKey ? `${publicMediaBase}/${tpl.previewKey}` : null;
 
   return (
     <div className="space-y-6">
@@ -123,13 +133,44 @@ function TemplateDetailInner({ id }: { id: string }) {
             {entry ? (
               <LivePlayer
                 compositionId={tpl.compositionId}
-                inputProps={previewPropsFromTemplate(tpl)}
+                inputProps={previewPropsFromTemplate(tpl, previewBgUrl)}
                 rounded="rounded-2xl"
               />
             ) : (
               <div className="aspect-[9/16] rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-xs text-zinc-500 text-center px-6">
                 Composition <code className="mx-1 text-zinc-300">{tpl.compositionId}</code> 가 등록되지 않았습니다.
                 <br />Root.tsx에 추가하거나 다른 composition id를 사용하세요.
+              </div>
+            )}
+          </div>
+
+          {/* ─── Bg sample generator ─────────────────────── */}
+          <div className="card space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="text-xs uppercase tracking-wider text-zinc-400 font-semibold">배경 샘플</div>
+              <button
+                className="btn btn-primary text-xs"
+                disabled={previewBg.isPending}
+                onClick={() => previewBg.mutate({ id })}
+                title={isShared ? "공유 템플릿은 owner만 미리보기를 갱신할 수 있습니다" : undefined}
+              >
+                {previewBg.isPending ? "생성 중... (~30s)" : previewBgUrl ? "재생성" : "샘플 생성"}
+              </button>
+            </div>
+            {previewBgUrl ? (
+              <div className="space-y-2">
+                <img
+                  src={previewBgUrl}
+                  alt="템플릿 배경 샘플"
+                  className="w-full aspect-[2/3] object-cover rounded-lg border border-zinc-800"
+                />
+                <div className="text-[11px] text-zinc-500 leading-relaxed">
+                  위 샘플은 <code className="text-zinc-400">bgPromptTemplate</code> + 일반 주제 한 줄로 gpt-image-2가 생성한 결과입니다. 실제 토픽이 돌면 토픽의 imageStylePrompt + 슬라이드별 prompt가 더해져 슬라이드마다 다른 이미지가 만들어집니다.
+                </div>
+              </div>
+            ) : (
+              <div className="text-xs text-zinc-500 leading-relaxed">
+                아직 샘플이 없습니다. 위 버튼을 누르면 이 템플릿의 배경 prompt가 어떤 그림을 만드는지 확인할 수 있습니다 (~$0.04 / 회).
               </div>
             )}
           </div>
@@ -167,12 +208,6 @@ function TemplateDetailInner({ id }: { id: string }) {
                     value={form.accentColor}
                     onChange={(e) => setForm({ ...form, accentColor: e.target.value })} />
                 </div>
-              </Field>
-              <Field label="전환 효과" hint="슬라이드 간 트랜지션 (현재 컴포지션 내장 spring + maskWipe 우선)">
-                <select className="input" value={form.transitionPreset}
-                  onChange={(e) => setForm({ ...form, transitionPreset: e.target.value as Transition })}>
-                  {TRANSITIONS.map((t) => <option key={t} value={t}>{t}</option>)}
-                </select>
               </Field>
               <Field label="기본 mood" hint="콤마 구분 — select-audio 가 BGM 매칭에 사용">
                 <input className="input" value={form.defaultAudioMood.join(", ")}
@@ -266,15 +301,25 @@ interface TemplateRow {
   accentColor: string;
 }
 
-// Build a sample preview that uses the template's accent (if the comp
-// supports an accent prop) but otherwise falls back to defaults — i.e.
-// the template-level visual identity, not topic-specific content.
-function previewPropsFromTemplate(tpl: TemplateRow): Record<string, unknown> {
-  // SeedanceReel reads the `accent` prop and tints the chapter / stat cards.
-  if (tpl.compositionId === "SeedanceReel") {
-    return { accent: tpl.accentColor };
+// Every composition now reads `accent` (CardSlideProps and VideoReelProps
+// both extend ReelCommonProps with an optional accent override). Pass the
+// template's color through for all. If a previewKey is set, we also pull
+// the composition's default slides and stamp the bg image onto each so the
+// LivePlayer shows what the *full* template — design + accent + bg —
+// will look like at runtime, not just the empty design.
+function previewPropsFromTemplate(tpl: TemplateRow, previewBgUrl: string | null): Record<string, unknown> {
+  const props: Record<string, unknown> = { accent: tpl.accentColor };
+  if (!previewBgUrl) return props;
+  const entry = getComposition(tpl.compositionId);
+  if (!entry) return props;
+  const defaults = entry.defaults as { slides?: Array<Record<string, unknown>> };
+  if (Array.isArray(defaults.slides)) {
+    props.slides = defaults.slides.map((s) => ({ ...s, bgImageUrl: previewBgUrl }));
+  } else if (tpl.compositionId === "ThreadsCard") {
+    // ThreadsCard takes a single bgImageUrl prop (not an array of slides).
+    props.bgImageUrl = previewBgUrl;
   }
-  return {};
+  return props;
 }
 
 function KindBadge({ kind }: { kind: string }) {

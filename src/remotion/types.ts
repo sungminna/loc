@@ -26,6 +26,13 @@ export interface ReelCommonProps {
   lang: "ko" | "en";
   audioUrl?: string;
   attribution?: string;
+  /**
+   * Hex accent override (e.g. template.accentColor). Card templates use
+   * their palette accent unless this is set; SeedanceReel always honors
+   * it. Keep optional so existing brief.json blobs without `accent` keep
+   * rendering with the template's natural color.
+   */
+  accent?: string;
 }
 
 export interface CardSlideProps extends ReelCommonProps {
@@ -53,6 +60,4 @@ export interface ReelVideoScene {
 
 export interface VideoReelProps extends ReelCommonProps {
   scenes: ReelVideoScene[];
-  /** Accent color override (e.g. template.accentColor). */
-  accent?: string;
 }

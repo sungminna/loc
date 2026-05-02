@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { trpc } from "../trpc";
 import { useToast } from "../components/Toast";
@@ -44,6 +44,7 @@ const EMPTY: TemplateForm = {
 
 export function Templates() {
   const list = trpc.templates.list.useQuery();
+  const me = trpc.me.useQuery();
   const utils = trpc.useUtils();
   const toast = useToast();
 
@@ -86,6 +87,7 @@ export function Templates() {
               <TemplateCard
                 key={t.id}
                 tpl={t}
+                publicMediaBase={me.data?.publicMediaBase ?? null}
                 onEdit={() => setEditing({ id: t.id, form: toForm(t) })}
                 onRemove={() => {
                   if (confirm(`"${t.name}" 삭제?`)) remove.mutate({ id: t.id });
@@ -199,17 +201,35 @@ interface TemplateRow {
   defaultAudioMood: string[]; durationSec: number;
   accentColor: string; bgPromptTemplate: string; transitionPreset: TemplateForm["transitionPreset"];
   bgMode: TemplateForm["bgMode"]; defaultBgR2Key: string;
+  previewKey: string | null;
   userId: string | null;
 }
 
-function TemplateCard({ tpl, onEdit, onRemove }: {
+function TemplateCard({ tpl, onEdit, onRemove, publicMediaBase }: {
   tpl: TemplateRow;
   onEdit: () => void;
   onRemove: () => void;
+  publicMediaBase: string | null;
 }) {
   const isShared = tpl.userId === null;
   const entry = getComposition(tpl.compositionId);
   const [hovered, setHovered] = useState(false);
+  const previewBgUrl = tpl.previewKey && publicMediaBase ? `${publicMediaBase}/${tpl.previewKey}` : null;
+
+  // Inject the previewKey bg into the composition's default slides so the
+  // hover-preview shows design + accent + bg together. Falls back to just
+  // accent when there's no preview yet.
+  const inputProps = useMemo<Record<string, unknown>>(() => {
+    const base: Record<string, unknown> = { accent: tpl.accentColor };
+    if (!previewBgUrl || !entry) return base;
+    const defaults = entry.defaults as { slides?: Array<Record<string, unknown>> };
+    if (Array.isArray(defaults.slides)) {
+      base.slides = defaults.slides.map((s) => ({ ...s, bgImageUrl: previewBgUrl }));
+    } else if (tpl.compositionId === "ThreadsCard") {
+      base.bgImageUrl = previewBgUrl;
+    }
+    return base;
+  }, [tpl, previewBgUrl, entry]);
 
   return (
     <div className="card flex flex-col gap-3 group hover:border-zinc-700 transition" onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
@@ -218,7 +238,7 @@ function TemplateCard({ tpl, onEdit, onRemove }: {
           {entry ? (
             <LivePlayer
               compositionId={tpl.compositionId}
-              inputProps={tpl.compositionId === "SeedanceReel" ? { accent: tpl.accentColor } : {}}
+              inputProps={inputProps}
               autoPlay={hovered}
               controls={false}
               loop
@@ -231,6 +251,11 @@ function TemplateCard({ tpl, onEdit, onRemove }: {
           )}
           <div className="absolute top-2 left-2 flex gap-1.5 pointer-events-none">
             <KindBadge kind={tpl.kind} />
+            {previewBgUrl ? (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/30 text-emerald-100 border border-emerald-400/40">
+                bg
+              </span>
+            ) : null}
           </div>
         </div>
       </Link>

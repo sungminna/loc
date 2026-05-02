@@ -40,6 +40,9 @@ export function Overview() {
   const todayPosts = posts.data?.filter((p) => p.publishedAt && p.publishedAt.getTime() >= todayStart).length ?? 0;
   const accountCount = accounts.data?.length ?? 0;
 
+  // Resolve topicId → topic name so run lists show something humans can read.
+  const topicNameById = new Map((topics.data ?? []).map((t) => [t.id, t.name]));
+
   const recentRuns = runs.data ?? [];
   const activeRuns = recentRuns.filter((r) => ACTIVE_STATUSES.has(r.status));
   const failed24h = recentRuns.filter((r) => r.status === "failed" && r.createdAt.getTime() >= todayStart - 86_400_000).length;
@@ -88,13 +91,14 @@ export function Overview() {
           </h2>
           <div className="text-sm divide-y divide-yellow-500/15">
             {activeRuns.map((r) => (
-              <Link to={`/topics/${r.topicId}`} key={r.id} className="flex items-center justify-between py-2.5 hover:text-yellow-200">
+              <Link to={`/runs/${r.id}`} key={r.id} className="flex items-center justify-between py-2.5 hover:text-yellow-200">
                 <div className="flex gap-3 items-center min-w-0">
                   <span className="px-2 py-0.5 rounded-full text-xs bg-yellow-500/20 text-yellow-300 inline-flex items-center gap-1.5">
                     <span className="inline-block w-1.5 h-1.5 rounded-full bg-yellow-300 animate-pulse" />
                     {r.status}
                   </span>
-                  <code className="text-zinc-400 text-xs">{r.id.slice(0, 8)}</code>
+                  <span className="font-medium truncate">{topicNameById.get(r.topicId) ?? "—"}</span>
+                  <code className="text-zinc-500 text-xs hidden sm:inline">{r.id.slice(0, 8)}</code>
                 </div>
                 <div className="text-zinc-500 text-xs shrink-0">
                   {r.startedAt ? `시작 ${formatRel(r.startedAt)}` : "큐 대기"}
@@ -133,16 +137,16 @@ export function Overview() {
         {recentRuns.length ? (
           <div className="text-sm divide-y divide-zinc-800">
             {recentRuns.slice(0, 12).map((r) => (
-              <div key={r.id} className="flex items-center justify-between py-2.5">
+              <Link to={`/runs/${r.id}`} key={r.id} className="flex items-center justify-between py-2.5 hover:bg-zinc-900/40 -mx-2 px-2 rounded">
                 <div className="flex gap-3 items-center min-w-0">
                   <span className={`px-2 py-0.5 rounded-full text-xs ${badgeTone(r.status)}`}>{r.status}</span>
-                  <code className="text-zinc-400 text-xs">{r.id.slice(0, 8)}</code>
+                  <span className="font-medium truncate">{topicNameById.get(r.topicId) ?? "—"}</span>
                   {r.error ? <span className="text-xs text-red-400 truncate max-w-md">{r.error}</span> : null}
                 </div>
                 <div className="text-zinc-500 text-xs shrink-0">
                   ${((r.costUsdMicros ?? 0) / 1_000_000).toFixed(3)} · {r.createdAt ? formatRel(r.createdAt) : "-"}
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         ) : <div className="text-zinc-500 text-sm">아직 실행 내역이 없습니다.</div>}

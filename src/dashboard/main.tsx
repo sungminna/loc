@@ -20,6 +20,7 @@ import { Accounts } from "./pages/Accounts";
 import { Templates } from "./pages/Templates";
 import { TemplateDetail } from "./pages/TemplateDetail";
 import { Overview } from "./pages/Overview";
+import { RunDetail } from "./pages/RunDetail";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 10_000, refetchOnWindowFocus: false } },
@@ -97,6 +98,7 @@ function App() {
             <Route path="/audio" element={<Audio />} />
             <Route path="/audio/:id" element={<AudioDetail />} />
             <Route path="/posts" element={<Posts />} />
+            <Route path="/runs/:id" element={<RunDetail />} />
           </Routes>
         </Shell>
       </ToastProvider>

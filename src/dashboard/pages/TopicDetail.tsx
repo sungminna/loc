@@ -515,6 +515,7 @@ function StoryboardTab({
     return {
       brand: { handle: "@yourhandle", name: "Loc" },
       lang: topic.lang === "en" ? "en" : "ko",
+      accent: templateAccent,
       slides: slides.length ? slides : undefined,
     };
   }, [draft, publicMediaBase, isVideoReel, templateAccent, topic.lang]);
@@ -607,6 +608,7 @@ function StoryboardTab({
               genIdx={genIdx}
               compositionId={compositionId}
               accent={templateAccent}
+              lang={topic.lang === "en" ? "en" : "ko"}
               publicMediaBase={publicMediaBase}
               onChange={(patch) => setSlide(i, patch)}
               onMove={(dir) => moveSlide(i, dir)}
@@ -699,7 +701,7 @@ function StoryboardTab({
 // ─── Per-slide editor with live mini-player ────────────────────────────
 
 function SlideEditor({
-  slide, index, total, genIdx, compositionId, accent, publicMediaBase,
+  slide, index, total, genIdx, compositionId, accent, lang, publicMediaBase,
   onChange, onMove, onRemove, onRegen,
 }: {
   slide: SlideDraft;
@@ -708,6 +710,7 @@ function SlideEditor({
   genIdx: number | null;
   compositionId: string;
   accent: string;
+  lang: "ko" | "en";
   publicMediaBase: string;
   onChange: (patch: Partial<SlideDraft>) => void;
   onMove: (dir: -1 | 1) => void;
@@ -720,7 +723,8 @@ function SlideEditor({
   // visible card — clean preview without the surrounding slides bleeding in.
   const oneSlideProps = useMemo<Record<string, unknown>>(() => ({
     brand: { handle: "@yourhandle", name: "Loc" },
-    lang: "ko",
+    lang,
+    accent,
     slides: [{
       kicker: slide.kicker,
       headline: slide.headline ?? "",
@@ -730,7 +734,7 @@ function SlideEditor({
       stat: slide.stat?.value ? slide.stat : undefined,
       bgImageUrl: slide.bgImageUrl ?? (slide.bgImageR2Key ? `${publicMediaBase}/${slide.bgImageR2Key}` : undefined),
     }],
-  }), [slide, publicMediaBase]);
+  }), [slide, publicMediaBase, accent, lang]);
 
   const loading = genIdx === index;
 
@@ -1162,7 +1166,7 @@ function RunsTab({ runs, notes }: { runs: RunRow[]; notes: NoteRow[] }) {
         ) : (
           <div className="space-y-2">
             {runs.map((r) => (
-              <div key={r.id} className="card flex items-center justify-between text-sm">
+              <Link to={`/runs/${r.id}`} key={r.id} className="card flex items-center justify-between text-sm hover:border-zinc-700 transition">
                 <div className="flex gap-3 items-center min-w-0">
                   <RunPill status={r.status} />
                   <code className="text-xs text-zinc-500">{r.id.slice(0, 10)}</code>
@@ -1171,7 +1175,7 @@ function RunsTab({ runs, notes }: { runs: RunRow[]; notes: NoteRow[] }) {
                 <div className="text-zinc-500 text-xs shrink-0 ml-3">
                   ${(r.costUsdMicros / 1_000_000).toFixed(3)} · {r.tokensIn + r.tokensOut} tok · {r.createdAt.toLocaleString("ko-KR")}
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         )}

@@ -24,23 +24,24 @@ export const defaultKineticTypeProps: CardSlideProps = {
   ],
 };
 
-export const KineticType: React.FC<CardSlideProps> = ({ brand, lang, slides, audioUrl, attribution }) => {
+export const KineticType: React.FC<CardSlideProps> = ({ brand, lang, slides, audioUrl, attribution, accent }) => {
   const { fps } = useVideoConfig();
   const fontFamily = lang === "ko" ? theme.fontFamilyKo : theme.fontFamilyEn;
   const list = slides.length ? slides : defaultKineticTypeProps.slides;
   const palette = palettes.ink;
+  const accentColor = accent ?? palette.accent;
 
   return (
-    <AbsoluteFill style={{ background: palette.bg, fontFamily, color: palette.text, overflow: "hidden" }}>
+    <AbsoluteFill style={{ background: palette.bg, fontFamily, color: palette.text, overflow: "hidden", perspective: "1600px" }}>
       {audioUrl ? <Audio src={audioUrl} volume={0.4} /> : null}
-      <NoiseBg />
+      <NoiseBg accent={accentColor} />
       {list.map((s, i) => (
         <Sequence key={i} from={i * SLIDE_FRAMES} durationInFrames={SLIDE_FRAMES + 12}>
-          <KineticSlide slide={s} index={i} total={list.length} fps={fps} accent={palette.accent} fontFamily={fontFamily} />
+          <KineticSlide slide={s} index={i} total={list.length} fps={fps} accent={accentColor} fontFamily={fontFamily} />
         </Sequence>
       ))}
-      <DotProgress total={list.length} accent={palette.accent} />
-      <BrandStamp brand={brand} accent={palette.accent} />
+      <DotProgress total={list.length} accent={accentColor} />
+      <BrandStamp brand={brand} accent={accentColor} />
       {attribution ? <Attribution text={attribution} /> : null}
     </AbsoluteFill>
   );
@@ -86,21 +87,26 @@ const KineticSlide: React.FC<{ slide: ReelSlide; index: number; total: number; f
         textAlign: "center", maxWidth: 920,
         opacity: exit,
         textShadow: index === 0 ? chromaShadow(2) : undefined,
+        transformStyle: "preserve-3d",
       }}>
         {words.map((w, i) => {
           const t = splitTextProgress(frame, fps, i, { startFrame: 8, perItemFrames: 6, durationFrames: 16 });
+          // 3D pop — words rotate up from rotateX(60deg) into 0 with depth.
+          const rx = (1 - t) * 60;
+          const tz = (1 - t) * -120;
           return (
             <span
               key={i}
               style={{
                 display: "inline-block",
-                fontSize: words.length > 4 ? 110 : 138,
+                fontSize: words.length > 4 ? (words.length > 6 ? 92 : 110) : 138,
                 fontWeight: 900,
                 lineHeight: 1.05,
                 letterSpacing: "-0.03em",
                 marginRight: 22,
                 opacity: t,
-                transform: `translateY(${(1 - t) * 50}px) scale(${0.9 + 0.1 * t})`,
+                transform: `translateY(${(1 - t) * 50}px) translateZ(${tz}px) rotateX(${rx}deg) scale(${0.92 + 0.08 * t})`,
+                transformOrigin: "50% 100%",
                 color: i === 0 && index === 0 ? accent : "inherit",
               }}
             >
@@ -132,12 +138,12 @@ const KineticSlide: React.FC<{ slide: ReelSlide; index: number; total: number; f
   );
 };
 
-const NoiseBg: React.FC = () => {
+const NoiseBg: React.FC<{ accent: string }> = ({ accent }) => {
   const frame = useCurrentFrame();
   return (
     <div style={{
       position: "absolute", inset: 0,
-      backgroundImage: `radial-gradient(circle at ${50 + Math.sin(frame / 60) * 10}% ${50 + Math.cos(frame / 70) * 10}%, rgba(255,228,92,0.08), transparent 50%)`,
+      backgroundImage: `radial-gradient(circle at ${50 + Math.sin(frame / 60) * 10}% ${50 + Math.cos(frame / 70) * 10}%, ${accent}14, transparent 50%)`,
     }} />
   );
 };
@@ -163,7 +169,7 @@ const DotProgress: React.FC<{ total: number; accent: string }> = ({ total, accen
 
 const BrandStamp: React.FC<{ brand: { handle: string; name: string }; accent: string }> = ({ brand, accent }) => (
   <div style={{
-    position: "absolute", bottom: 80, left: 0, right: 0,
+    position: "absolute", bottom: 140, left: 0, right: 0,
     display: "flex", alignItems: "center", justifyContent: "center", gap: 14,
     fontSize: 24, color: "rgba(255,255,255,0.7)", letterSpacing: 3,
   }}>

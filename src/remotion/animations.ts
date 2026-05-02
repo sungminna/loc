@@ -163,3 +163,51 @@ export function grainPulse(frame: number, base = 0.08, amp = 0.04, periodFrames 
 export function chromaShadow(strength = 4): string {
   return `${strength}px 0 0 rgba(255,0,80,0.7), -${strength}px 0 0 rgba(0,180,255,0.7)`;
 }
+
+// ─── 3D entrance (perspective flip) ────────────────────────────────────
+// Card tilts into place from `from°` on the chosen axis with a translateZ
+// pop, simulating depth. Returns a transform string + opacity so a single
+// element can drop both into its style without manual composition.
+
+export function flip3dEnter(
+  frame: number,
+  fps: number,
+  opts: { axis?: "x" | "y"; from?: number; delay?: number; config?: Partial<SpringConfig> } = {},
+): { transform: string; opacity: number; progress: number } {
+  const { axis = "x", from = 30, delay = 0, config } = opts;
+  const t = spring({
+    frame: frame - delay,
+    fps,
+    config: { damping: 20, mass: 0.7, stiffness: 110, ...config },
+  });
+  const angle = (1 - t) * from;
+  const z = (1 - t) * -160;
+  const transform = axis === "x"
+    ? `perspective(1400px) rotateX(${angle}deg) translateZ(${z}px)`
+    : `perspective(1400px) rotateY(${angle}deg) translateZ(${z}px)`;
+  return { transform, opacity: t, progress: t };
+}
+
+// ─── parallax breathing tilt ───────────────────────────────────────────
+// Subtle continuous floating motion. Gives a card the impression of being
+// suspended in space without distracting from the content.
+
+export function parallaxTilt(
+  frame: number,
+  opts: { amplitude?: number; periodFrames?: number; perspectivePx?: number } = {},
+): string {
+  const { amplitude = 4, periodFrames = 240, perspectivePx = 1400 } = opts;
+  const rx = Math.sin((frame / periodFrames) * Math.PI * 2) * amplitude;
+  const ry = Math.cos((frame / periodFrames) * Math.PI * 2 * 0.8) * amplitude * 1.2;
+  return `perspective(${perspectivePx}px) rotateX(${rx}deg) rotateY(${ry}deg)`;
+}
+
+// ─── deterministic pseudo-random (replaces Math.random in renders) ─────
+// Math.random() is non-deterministic per render call which makes server
+// renders diverge from previews and causes flicker in @remotion/player.
+// This hash returns a stable 0..1 from (frame, seed).
+
+export function pseudoRandom(frame: number, seed = 1): number {
+  const x = Math.sin(frame * 12.9898 + seed * 78.233) * 43758.5453;
+  return x - Math.floor(x);
+}

@@ -1,5 +1,6 @@
 import { AbsoluteFill, Audio, Img, Sequence, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
 import { theme } from "../theme";
+import { flip3dEnter } from "../animations";
 
 export interface CardNewsSlide {
   kicker?: string;
@@ -15,6 +16,8 @@ export interface CardNewsProps {
   slides: CardNewsSlide[];
   audioUrl?: string;
   attribution?: string;
+  /** Hex override for the accent (kicker / progress fill / brand dot). */
+  accent?: string;
 }
 
 export const defaultCardNewsProps: CardNewsProps = {
@@ -31,26 +34,27 @@ export const defaultCardNewsProps: CardNewsProps = {
 
 const SLIDE_FRAMES = 90; // 3초 @ 30fps
 
-export const CardNews: React.FC<CardNewsProps> = ({ brand, lang, slides, audioUrl, attribution }) => {
+export const CardNews: React.FC<CardNewsProps> = ({ brand, lang, slides, audioUrl, attribution, accent }) => {
   const { fps, durationInFrames, width, height } = useVideoConfig();
   const frame = useCurrentFrame();
   const fontFamily = lang === "ko" ? theme.fontFamilyKo : theme.fontFamilyEn;
+  const accentColor = accent ?? theme.accent;
 
   const slidesToRender = slides.length ? slides : defaultCardNewsProps.slides;
 
   return (
     <AbsoluteFill style={{ background: theme.bgGradient, fontFamily, color: theme.text }}>
-      <BackdropBlobs />
+      <BackdropBlobs accent={accentColor} />
       {audioUrl ? <Audio src={audioUrl} volume={0.4} /> : null}
 
       {slidesToRender.map((slide, i) => (
         <Sequence key={i} from={i * SLIDE_FRAMES} durationInFrames={SLIDE_FRAMES + 12}>
-          <Slide slide={slide} index={i} total={slidesToRender.length} fps={fps} fontFamily={fontFamily} />
+          <Slide slide={slide} index={i} total={slidesToRender.length} fps={fps} fontFamily={fontFamily} accent={accentColor} />
         </Sequence>
       ))}
 
-      <ProgressBar total={slidesToRender.length} frame={frame} />
-      <Watermark brand={brand} />
+      <ProgressBar total={slidesToRender.length} frame={frame} accent={accentColor} />
+      <Watermark brand={brand} accent={accentColor} />
       {attribution ? <Attribution text={attribution} /> : null}
 
       <FrameDecor width={width} height={height} />
@@ -58,7 +62,7 @@ export const CardNews: React.FC<CardNewsProps> = ({ brand, lang, slides, audioUr
   );
 };
 
-const BackdropBlobs: React.FC = () => {
+const BackdropBlobs: React.FC<{ accent: string }> = ({ accent }) => {
   const frame = useCurrentFrame();
   const drift = (frame / 30) * 8;
   return (
@@ -70,7 +74,7 @@ const BackdropBlobs: React.FC = () => {
           height: 900,
           left: -200 + drift,
           top: -150,
-          background: `radial-gradient(circle, ${theme.accent}33 0%, transparent 60%)`,
+          background: `radial-gradient(circle, ${accent}33 0%, transparent 60%)`,
           filter: "blur(60px)",
         }}
       />
@@ -95,17 +99,20 @@ interface SlideProps {
   total: number;
   fps: number;
   fontFamily: string;
+  accent: string;
 }
 
-const Slide: React.FC<SlideProps> = ({ slide, index, total, fps, fontFamily }) => {
+const Slide: React.FC<SlideProps> = ({ slide, index, total, fps, fontFamily, accent }) => {
   const frame = useCurrentFrame();
   const enter = spring({ frame, fps, config: { damping: 200, mass: 0.6, stiffness: 120 } });
   const exit = interpolate(frame, [SLIDE_FRAMES - 12, SLIDE_FRAMES + 12], [1, 0], { extrapolateRight: "clamp" });
   const opacity = enter * exit;
   const translateY = interpolate(enter, [0, 1], [40, 0]);
+  // Subtle 3D entrance — card lifts in from a slight tilt for cinematic depth.
+  const tilt3d = flip3dEnter(frame, fps, { axis: "x", from: 18 });
 
   return (
-    <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", padding: 96 }}>
+    <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", padding: 96, perspective: "1400px" }}>
       {slide.bgImageUrl ? (
         <Img
           src={slide.bgImageUrl}
@@ -124,7 +131,8 @@ const Slide: React.FC<SlideProps> = ({ slide, index, total, fps, fontFamily }) =
       <div
         style={{
           opacity,
-          transform: `translateY(${translateY}px)`,
+          transform: `${tilt3d.transform} translateY(${translateY}px)`,
+          transformStyle: "preserve-3d",
           background: theme.cardBg,
           border: `1px solid ${theme.cardBorder}`,
           backdropFilter: "blur(24px)",
@@ -134,6 +142,7 @@ const Slide: React.FC<SlideProps> = ({ slide, index, total, fps, fontFamily }) =
           maxWidth: 880,
           textAlign: "center",
           fontFamily,
+          boxShadow: "0 40px 100px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04) inset",
         }}
       >
         {slide.kicker ? (
@@ -142,7 +151,7 @@ const Slide: React.FC<SlideProps> = ({ slide, index, total, fps, fontFamily }) =
               fontSize: 28,
               fontWeight: 700,
               letterSpacing: 6,
-              color: theme.accent,
+              color: accent,
               marginBottom: 32,
               textTransform: "uppercase",
             }}
@@ -194,7 +203,7 @@ const Slide: React.FC<SlideProps> = ({ slide, index, total, fps, fontFamily }) =
   );
 };
 
-const ProgressBar: React.FC<{ total: number; frame: number }> = ({ total, frame }) => {
+const ProgressBar: React.FC<{ total: number; frame: number; accent: string }> = ({ total, frame, accent }) => {
   const slideProgress = Math.min(total - 1, Math.floor(frame / SLIDE_FRAMES));
   return (
     <div style={{ position: "absolute", top: 56, left: 56, right: 56, display: "flex", gap: 8 }}>
@@ -202,7 +211,7 @@ const ProgressBar: React.FC<{ total: number; frame: number }> = ({ total, frame 
         const fill = i < slideProgress ? 1 : i === slideProgress ? (frame % SLIDE_FRAMES) / SLIDE_FRAMES : 0;
         return (
           <div key={i} style={{ flex: 1, height: 6, background: "rgba(255,255,255,0.16)", borderRadius: 4, overflow: "hidden" }}>
-            <div style={{ width: `${fill * 100}%`, height: "100%", background: theme.accent }} />
+            <div style={{ width: `${fill * 100}%`, height: "100%", background: accent }} />
           </div>
         );
       })}
@@ -210,11 +219,15 @@ const ProgressBar: React.FC<{ total: number; frame: number }> = ({ total, frame 
   );
 };
 
-const Watermark: React.FC<{ brand: { handle: string; name: string } }> = ({ brand }) => (
+// Reels safe area — Instagram's bottom UI overlay sits roughly in the
+// bottom 110px. Pin the brand block above that everywhere for parity.
+const REELS_SAFE_BOTTOM = 140;
+
+const Watermark: React.FC<{ brand: { handle: string; name: string }; accent: string }> = ({ brand, accent }) => (
   <div
     style={{
       position: "absolute",
-      bottom: 64,
+      bottom: REELS_SAFE_BOTTOM,
       left: 0,
       right: 0,
       display: "flex",
@@ -226,6 +239,7 @@ const Watermark: React.FC<{ brand: { handle: string; name: string } }> = ({ bran
       letterSpacing: 2,
     }}
   >
+    <span style={{ width: 6, height: 6, background: accent, borderRadius: 3 }} />
     <span style={{ fontWeight: 700, color: theme.text }}>{brand.name}</span>
     <span>·</span>
     <span>{brand.handle}</span>

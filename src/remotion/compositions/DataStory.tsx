@@ -23,24 +23,25 @@ export const defaultDataStoryProps: CardSlideProps = {
   ],
 };
 
-export const DataStory: React.FC<CardSlideProps> = ({ brand, lang, slides, audioUrl, attribution }) => {
+export const DataStory: React.FC<CardSlideProps> = ({ brand, lang, slides, audioUrl, attribution, accent }) => {
   const { fps } = useVideoConfig();
   const font = lang === "ko" ? theme.fontFamilyKo : theme.fontFamilyEn;
   const list = slides.length ? slides : defaultDataStoryProps.slides;
   const palette = palettes.midnight;
+  const accentColor = accent ?? palette.accent;
 
   return (
-    <AbsoluteFill style={{ background: palette.bg, color: palette.text, fontFamily: font }}>
+    <AbsoluteFill style={{ background: palette.bg, color: palette.text, fontFamily: font, perspective: "1800px" }}>
       {audioUrl ? <Audio src={audioUrl} volume={0.4} /> : null}
 
       <Grid />
       {list.map((s, i) => (
         <Sequence key={i} from={i * SLIDE_FRAMES} durationInFrames={SLIDE_FRAMES + 12}>
-          <DataSlide slide={s} index={i} total={list.length} fps={fps} accent={palette.accent} />
+          <DataSlide slide={s} index={i} total={list.length} fps={fps} accent={accentColor} />
         </Sequence>
       ))}
 
-      <Footer brand={brand} attribution={attribution} accent={palette.accent} />
+      <Footer brand={brand} attribution={attribution} accent={accentColor} />
     </AbsoluteFill>
   );
 };
@@ -82,13 +83,13 @@ const DataSlide: React.FC<{ slide: ReelSlide; index: number; total: number; fps:
         <NarrativeSlide slide={slide} accent={accent} opacity={opacity} enter={enter} />
       )}
 
-      {/* axis-style baseline */}
+      {/* axis-style baseline — sits above the brand footer so it acts like a chart x-axis */}
       <div style={{
-        position: "absolute", bottom: 220, left: 96, right: 96,
+        position: "absolute", bottom: 240, left: 96, right: 96,
         height: 1, background: "rgba(255,255,255,0.15)",
       }} />
       <div style={{
-        position: "absolute", bottom: 200, left: 96,
+        position: "absolute", bottom: 220, left: 96,
         fontSize: 18, color: "rgba(255,255,255,0.45)", letterSpacing: 3,
       }}>
         SOURCE · TRENDING NOW
@@ -104,43 +105,54 @@ const StatHero: React.FC<{
   const decimals = stat.value.includes(".") ? 1 : 0;
   const ringT = spring({ frame: frame - 6, fps, config: { damping: 18, mass: 0.6, stiffness: 80 } });
   const ringPct = Math.min(1, target > 100 ? 1 : target / 100);
-  const RAD = 250;
+  const RAD = 150;
   const C = 2 * Math.PI * RAD;
+  // 3D donut entrance — rotates in around Y so the ring "lands" facing camera.
+  const donutEnter = spring({ frame: frame - 4, fps, config: { damping: 16, stiffness: 90 } });
+  const donutRy = (1 - donutEnter) * -65;
 
   return (
     <>
+      {/* Compact donut — top-right corner, 360px so it never collides with
+          the hero number which now spans full width below it. */}
       <div style={{
-        position: "absolute", top: "26%", left: 96,
-        fontSize: 256, fontWeight: 900, lineHeight: 1, color: accent,
+        position: "absolute", top: 220, right: 96,
+        opacity: opacity * 0.95,
+        transform: `perspective(1200px) rotateY(${donutRy}deg)`,
+      }}>
+        <svg width="360" height="360">
+          <circle cx="180" cy="180" r={RAD} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="12" />
+          <circle
+            cx="180" cy="180" r={RAD} fill="none" stroke={accent} strokeWidth="12"
+            strokeDasharray={C} strokeDashoffset={C - C * ringPct * ringT}
+            strokeLinecap="round" transform="rotate(-90 180 180)"
+          />
+        </svg>
+      </div>
+
+      {/* Hero number — full-width row, top-aligned just below the kicker. */}
+      <div style={{
+        position: "absolute", top: 360, left: 96, right: 96,
+        fontSize: 280, fontWeight: 900, lineHeight: 1, color: accent,
         letterSpacing: "-0.04em", fontFeatureSettings: "'tnum'",
         opacity,
       }}>
         {countUp(frame, target, { startFrame: 8, durationFrames: 36, suffix: stat.suffix ?? "", decimals })}
       </div>
 
-      {/* donut ring on right */}
-      <svg width="600" height="600" style={{
-        position: "absolute", right: 40, top: "22%", opacity: opacity * 0.85,
-      }}>
-        <circle cx="300" cy="300" r={RAD} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="14" />
-        <circle
-          cx="300" cy="300" r={RAD} fill="none" stroke={accent} strokeWidth="14"
-          strokeDasharray={C} strokeDashoffset={C - C * ringPct * ringT}
-          strokeLinecap="round" transform="rotate(-90 300 300)"
-        />
-      </svg>
-
+      {/* Stat label */}
       <div style={{
-        position: "absolute", top: "60%", left: 96, right: 96,
+        position: "absolute", top: 760, left: 96, right: 96,
         fontSize: 32, color: "rgba(255,255,255,0.78)", letterSpacing: 1,
-        opacity, maxWidth: 760,
+        opacity, maxWidth: 880,
       }}>
         {stat.label ?? ""}
       </div>
 
+      {/* Headline */}
       <div style={{
-        position: "absolute", top: "70%", left: 96, right: 96,
-        fontSize: 60, fontWeight: 800, lineHeight: 1.15, letterSpacing: "-0.01em",
+        position: "absolute", top: 860, left: 96, right: 96,
+        fontSize: 64, fontWeight: 800, lineHeight: 1.15, letterSpacing: "-0.01em",
         opacity, maxWidth: 920,
       }}>
         {headline}
@@ -189,7 +201,7 @@ const Grid: React.FC = () => (
 const Footer: React.FC<{ brand: { handle: string; name: string }; attribution?: string; accent: string }> = ({ brand, attribution, accent }) => (
   <>
     <div style={{
-      position: "absolute", bottom: 96, left: 96, right: 96,
+      position: "absolute", bottom: 140, left: 96, right: 96,
       display: "flex", justifyContent: "space-between", alignItems: "center",
       fontSize: 22, letterSpacing: 5, color: "rgba(255,255,255,0.65)",
     }}>
@@ -201,7 +213,7 @@ const Footer: React.FC<{ brand: { handle: string; name: string }; attribution?: 
     </div>
     {attribution ? (
       <div style={{
-        position: "absolute", bottom: 28, left: 0, right: 0, textAlign: "center",
+        position: "absolute", bottom: 60, left: 0, right: 0, textAlign: "center",
         fontSize: 14, color: "rgba(255,255,255,0.35)",
       }}>{attribution}</div>
     ) : null}

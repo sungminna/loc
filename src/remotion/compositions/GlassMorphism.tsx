@@ -7,7 +7,7 @@
 import { AbsoluteFill, Audio, Img, Sequence, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
 import type { CardSlideProps, ReelSlide } from "../types";
 import { palettes, theme } from "../theme";
-import { kenBurns } from "../animations";
+import { kenBurns, parallaxTilt } from "../animations";
 
 const SLIDE_FRAMES = 96;
 
@@ -22,30 +22,31 @@ export const defaultGlassMorphismProps: CardSlideProps = {
   ],
 };
 
-export const GlassMorphism: React.FC<CardSlideProps> = ({ brand, lang, slides, audioUrl, attribution }) => {
+export const GlassMorphism: React.FC<CardSlideProps> = ({ brand, lang, slides, audioUrl, attribution, accent }) => {
   const { fps } = useVideoConfig();
   const font = lang === "ko" ? theme.fontFamilyKo : theme.fontFamilyEn;
   const list = slides.length ? slides : defaultGlassMorphismProps.slides;
+  const accentColor = accent ?? "#ffe45c";
 
   return (
-    <AbsoluteFill style={{ background: "#1a0c2e", color: "#f5f5fa", fontFamily: font, overflow: "hidden" }}>
+    <AbsoluteFill style={{ background: "#1a0c2e", color: "#f5f5fa", fontFamily: font, overflow: "hidden", perspective: "1600px" }}>
       {audioUrl ? <Audio src={audioUrl} volume={0.4} /> : null}
 
-      <ChromaBg />
+      <ChromaBg accent={accentColor} />
 
       {list.map((s, i) => (
         <Sequence key={i} from={i * SLIDE_FRAMES} durationInFrames={SLIDE_FRAMES + 12}>
-          <GlassSlide slide={s} index={i} total={list.length} fps={fps} />
+          <GlassSlide slide={s} index={i} total={list.length} fps={fps} accent={accentColor} />
         </Sequence>
       ))}
 
-      <Brand brand={brand} />
+      <Brand brand={brand} accent={accentColor} />
       {attribution ? <Attribution text={attribution} /> : null}
     </AbsoluteFill>
   );
 };
 
-const ChromaBg: React.FC = () => {
+const ChromaBg: React.FC<{ accent: string }> = ({ accent }) => {
   const frame = useCurrentFrame();
   const t = frame / 30;
   return (
@@ -65,18 +66,21 @@ const ChromaBg: React.FC = () => {
       <div style={{
         position: "absolute", width: 900, height: 900,
         left: 400 + Math.sin(t * 0.5) * 120, top: 600 + Math.cos(t * 0.45) * 80,
-        background: "radial-gradient(circle, rgba(255,228,92,0.35) 0%, transparent 60%)",
+        background: `radial-gradient(circle, ${accent}59 0%, transparent 60%)`,
         filter: "blur(100px)",
       }} />
     </>
   );
 };
 
-const GlassSlide: React.FC<{ slide: ReelSlide; index: number; total: number; fps: number }> = ({ slide, index, total, fps }) => {
+const GlassSlide: React.FC<{ slide: ReelSlide; index: number; total: number; fps: number; accent: string }> = ({ slide, index, total, fps, accent }) => {
   const frame = useCurrentFrame();
   const enter = spring({ frame, fps, config: { damping: 200, mass: 0.7, stiffness: 100 } });
   const exit = interpolate(frame, [SLIDE_FRAMES - 14, SLIDE_FRAMES + 10], [1, 0], { extrapolateRight: "clamp" });
   const opacity = enter * exit;
+  // Gentle continuous depth — card breathes in/out of plane.
+  const breath = parallaxTilt(frame, { amplitude: 1.6, periodFrames: 360 });
+  const enterTilt = `rotateX(${(1 - enter) * 16}deg) translateZ(${(1 - enter) * -120}px)`;
 
   return (
     <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", padding: 80 }}>
@@ -96,15 +100,16 @@ const GlassSlide: React.FC<{ slide: ReelSlide; index: number; total: number; fps
         borderRadius: 56,
         padding: "72px 64px",
         width: "100%", maxWidth: 880,
-        boxShadow: "0 30px 80px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.25)",
+        boxShadow: "0 40px 120px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.25)",
         textAlign: "center",
         opacity,
-        transform: `translateY(${(1 - enter) * 60}px) scale(${interpolate(enter, [0, 1], [0.94, 1])})`,
+        transform: `${breath} ${enterTilt} translateY(${(1 - enter) * 60}px) scale(${interpolate(enter, [0, 1], [0.94, 1])})`,
+        transformStyle: "preserve-3d",
       }}>
         {slide.kicker ? (
           <div style={{
             display: "inline-block", padding: "8px 18px", marginBottom: 32,
-            background: "rgba(255,255,255,0.12)", borderRadius: 999,
+            background: `${accent}26`, border: `1px solid ${accent}59`, borderRadius: 999,
             fontSize: 20, fontWeight: 700, letterSpacing: 6,
             color: "#fff", textTransform: "uppercase",
           }}>
@@ -142,12 +147,13 @@ const GlassSlide: React.FC<{ slide: ReelSlide; index: number; total: number; fps
   );
 };
 
-const Brand: React.FC<{ brand: { handle: string; name: string } }> = ({ brand }) => (
+const Brand: React.FC<{ brand: { handle: string; name: string }; accent: string }> = ({ brand, accent }) => (
   <div style={{
-    position: "absolute", bottom: 64, left: 0, right: 0,
+    position: "absolute", bottom: 140, left: 0, right: 0,
     display: "flex", justifyContent: "center", gap: 16, alignItems: "center",
     fontSize: 24, color: "rgba(255,255,255,0.7)", letterSpacing: 3,
   }}>
+    <span style={{ width: 6, height: 6, background: accent, borderRadius: 3 }} />
     <span style={{ fontWeight: 700, color: "#fff" }}>{brand.name}</span>
     <span>·</span>
     <span>{brand.handle}</span>

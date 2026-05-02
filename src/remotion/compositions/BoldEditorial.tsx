@@ -24,20 +24,21 @@ export const defaultBoldEditorialProps: CardSlideProps = {
   ],
 };
 
-export const BoldEditorial: React.FC<CardSlideProps> = ({ brand, lang, slides, audioUrl, attribution }) => {
+export const BoldEditorial: React.FC<CardSlideProps> = ({ brand, lang, slides, audioUrl, attribution, accent }) => {
   const { fps } = useVideoConfig();
   const fontSerif = theme.fontFamilySerif;
   const fontSans = lang === "ko" ? theme.fontFamilyKo : theme.fontFamilyEn;
   const list = slides.length ? slides : defaultBoldEditorialProps.slides;
   const palette = palettes.paper;
+  const accentColor = accent ?? palette.accent;
 
   return (
-    <AbsoluteFill style={{ background: palette.bg, color: palette.text }}>
+    <AbsoluteFill style={{ background: palette.bg, color: palette.text, perspective: "1800px" }}>
       {audioUrl ? <Audio src={audioUrl} volume={0.35} /> : null}
 
       {list.map((s, i) => (
         <Sequence key={i} from={i * SLIDE_FRAMES} durationInFrames={SLIDE_FRAMES + 12}>
-          <EditorialSlide slide={s} index={i} total={list.length} fps={fps} fontSerif={fontSerif} fontSans={fontSans} accent={palette.accent} brand={brand} />
+          <EditorialSlide slide={s} index={i} total={list.length} fps={fps} fontSerif={fontSerif} fontSans={fontSans} accent={accentColor} brand={brand} />
         </Sequence>
       ))}
 
@@ -63,6 +64,9 @@ const EditorialSlide: React.FC<SlideProps> = ({ slide, index, total, fps, fontSe
   const exit = interpolate(frame, [SLIDE_FRAMES - 14, SLIDE_FRAMES + 10], [1, 0], { extrapolateRight: "clamp" });
   const opacity = enter * exit;
   const headlineLines = slide.headline.split("\n");
+  // 3D side-panel — image swings in from rotateY when present.
+  const panelRy = (1 - enter) * 22;
+  const panelTz = (1 - enter) * -160;
 
   return (
     <AbsoluteFill>
@@ -71,7 +75,9 @@ const EditorialSlide: React.FC<SlideProps> = ({ slide, index, total, fps, fontSe
           position: "absolute", top: 0, right: 0, width: "60%", height: "100%",
           objectFit: "cover", opacity: 0.92,
           clipPath: maskWipe(frame, 22, "left"),
-          transform: kenBurns(frame, SLIDE_FRAMES, "out"),
+          transform: `${kenBurns(frame, SLIDE_FRAMES, "out")} translateZ(${panelTz}px) rotateY(${-panelRy}deg)`,
+          transformOrigin: "right center",
+          boxShadow: "-20px 0 60px rgba(0,0,0,0.18)",
         }} />
       ) : null}
 
@@ -116,10 +122,10 @@ const EditorialSlide: React.FC<SlideProps> = ({ slide, index, total, fps, fontSe
         ))}
       </div>
 
-      {/* body */}
+      {/* body — pinned above the footer rule (which sits at bottom 200) */}
       {slide.body ? (
         <div style={{
-          position: "absolute", left: 96, right: 96, bottom: 280,
+          position: "absolute", left: 96, right: 96, bottom: 320,
           fontFamily: fontSans, fontSize: 38, lineHeight: 1.45, color: "rgba(0,0,0,0.7)",
           maxWidth: 760, opacity, transform: `translateY(${(1 - enter) * 20}px)`,
         }}>
@@ -129,22 +135,25 @@ const EditorialSlide: React.FC<SlideProps> = ({ slide, index, total, fps, fontSe
 
       {slide.emphasis ? (
         <div style={{
-          position: "absolute", right: 120, bottom: 200,
-          fontFamily: fontSerif, fontSize: 200, color: accent, opacity: opacity * 0.9,
+          position: "absolute", right: 120, bottom: 260,
+          fontFamily: fontSerif, fontSize: 180, color: accent, opacity: opacity * 0.9,
           transform: `rotate(${interpolate(enter, [0, 1], [-20, 0])}deg)`,
         }}>
           {slide.emphasis}
         </div>
       ) : null}
 
-      {/* footer rule */}
-      <div style={{ position: "absolute", bottom: 120, left: 96, right: 96, height: 1, background: "rgba(0,0,0,0.4)" }} />
+      {/* footer rule sits above the brand block (Reels safe area at 140) */}
+      <div style={{ position: "absolute", bottom: 200, left: 96, right: 96, height: 1, background: "rgba(0,0,0,0.4)" }} />
       <div style={{
-        position: "absolute", bottom: 70, left: 96, right: 96,
-        display: "flex", justifyContent: "space-between",
+        position: "absolute", bottom: 150, left: 96, right: 96,
+        display: "flex", justifyContent: "space-between", alignItems: "center",
         fontFamily: fontSans, fontSize: 18, color: "rgba(0,0,0,0.6)", letterSpacing: 3,
       }}>
-        <span>{brand.handle}</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ width: 6, height: 6, background: accent, borderRadius: 3 }} />
+          {brand.handle}
+        </span>
         <span>FOLIO {String(index + 1).padStart(3, "0")}</span>
       </div>
     </AbsoluteFill>

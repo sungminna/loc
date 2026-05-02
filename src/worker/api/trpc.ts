@@ -13,7 +13,8 @@ import {
 } from "@db/schema";
 import type { Env } from "@shared/env";
 import { authenticate, type AuthCtx } from "../auth";
-import { generateImageForTopic } from "../image-gen";
+import { generateImageForTopic, generateTemplatePreview } from "../image-gen";
+import { publishRunToInstagram, publishRunToThreads, retryPostById } from "../publish";
 
 const t = initTRPC.context<AuthCtx>().create({ transformer: superjson });
 
@@ -183,6 +184,10 @@ export const appRouter = t.router({
     email: ctx.user.email,
     name: ctx.user.name,
     role: ctx.user.role,
+    // Public R2 base — handy for any dashboard view that needs to render an
+    // R2-keyed asset (template preview thumbnails, etc.) without an extra
+    // query.
+    publicMediaBase: ctx.env.R2_PUBLIC_BASE,
   })),
 
   topics: t.router({
@@ -326,7 +331,12 @@ export const appRouter = t.router({
         orderBy: [desc(topics.createdAt)],
       });
       const referenced = usingTopics.filter((tp) => tp.templateSlugs.includes(tpl.slug));
-      return { template: tpl, topicsUsing: referenced, isShared: tpl.userId === null };
+      return {
+        template: tpl,
+        topicsUsing: referenced,
+        isShared: tpl.userId === null,
+        publicMediaBase: ctx.env.R2_PUBLIC_BASE,
+      };
     }),
     create: proc.input(templateInputSchema).mutation(async ({ ctx, input }) => {
       await ensureSlugFree(ctx, input.slug);
@@ -344,6 +354,52 @@ export const appRouter = t.router({
       await ownedTemplate(ctx, input.id);
       await ctx.db.delete(templates).where(eq(templates.id, input.id));
       return { ok: true };
+    }),
+    // Generate a sample background image so users can SEE what bgPromptTemplate
+    // produces before running a real topic. Result is stored at
+    //   templates/<slug>/preview-bg-<ts>.webp
+    // and the row's `previewKey` is updated. For shared (userId IS NULL)
+    // templates only the workspace owner can regenerate — otherwise any tenant
+    // could spend Replicate budget overwriting a global preview.
+    previewBg: proc.input(z.object({
+      id: z.string(),
+      samplePrompt: z.string().min(0).max(1000).optional(),
+    })).mutation(async ({ ctx, input }) => {
+      const tpl = await ctx.db.query.templates.findFirst({ where: eq(templates.id, input.id) });
+      if (!tpl) throw new TRPCError({ code: "NOT_FOUND" });
+      const isShared = tpl.userId === null;
+      if (!isShared && tpl.userId !== ctx.user.id) throw new TRPCError({ code: "NOT_FOUND" });
+      if (isShared && ctx.user.role !== "owner") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "공유 템플릿의 미리보기는 owner만 생성할 수 있습니다. '복제' 후 본인 템플릿에서 생성하세요.",
+        });
+      }
+
+      // A neutral one-line subject so the bg prompt isn't trying to render
+      // empty space. Picks a generic topic that exercises the template's
+      // visual language (typography-friendly composition).
+      const sample = (input.samplePrompt ?? "").trim()
+        || "abstract editorial subject illustrating a representative social-media topic, clean composition with negative space for typography overlay";
+      const composed = composePrompt(tpl.bgPromptTemplate, sample);
+
+      const result = await generateTemplatePreview({
+        env: ctx.env,
+        userId: ctx.user.id,
+        templateSlug: tpl.slug,
+        prompt: composed,
+        // gpt-image-2 only accepts 1:1 / 3:2 / 2:3 — none match Reels (9:16)
+        // or ThreadsCard (4:5) exactly. 2:3 is the tallest available; both
+        // compositions render it under `objectFit: cover` so cropping is
+        // visually clean for either target.
+        aspect: "2:3",
+      });
+
+      await ctx.db.update(templates)
+        .set({ previewKey: result.r2Key, updatedAt: new Date() })
+        .where(eq(templates.id, tpl.id));
+
+      return { ...result, templateId: tpl.id };
     }),
     duplicate: proc.input(z.object({ id: z.string(), newSlug: z.string().regex(/^[a-z0-9-]+$/) }))
       .mutation(async ({ ctx, input }) => {
@@ -496,11 +552,25 @@ export const appRouter = t.router({
     get: proc.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
       const run = await ctx.db.query.runs.findFirst({ where: eq(runs.id, input.id) });
       if (!run || run.userId !== ctx.user.id) throw new TRPCError({ code: "NOT_FOUND" });
-      const [runAssets, runPosts] = await Promise.all([
+      const [runAssets, runPosts, topic] = await Promise.all([
         ctx.db.query.assets.findMany({ where: eq(assets.runId, run.id), orderBy: [desc(assets.createdAt)] }),
         ctx.db.query.posts.findMany({ where: eq(posts.runId, run.id), orderBy: [desc(posts.createdAt)] }),
+        ctx.db.query.topics.findFirst({ where: eq(topics.id, run.topicId) }),
       ]);
-      return { run, assets: runAssets, posts: runPosts, publicMediaBase: ctx.env.R2_PUBLIC_BASE };
+      return { run, assets: runAssets, posts: runPosts, topic, publicMediaBase: ctx.env.R2_PUBLIC_BASE };
+    }),
+    publishInstagram: proc.input(z.object({ runId: z.string() })).mutation(async ({ ctx, input }) => {
+      const run = await ctx.db.query.runs.findFirst({ where: eq(runs.id, input.runId) });
+      if (!run || run.userId !== ctx.user.id) throw new TRPCError({ code: "NOT_FOUND" });
+      return publishRunToInstagram(ctx.env, run);
+    }),
+    publishThreads: proc.input(z.object({ runId: z.string() })).mutation(async ({ ctx, input }) => {
+      const run = await ctx.db.query.runs.findFirst({ where: eq(runs.id, input.runId) });
+      if (!run || run.userId !== ctx.user.id) throw new TRPCError({ code: "NOT_FOUND" });
+      return publishRunToThreads(ctx.env, run);
+    }),
+    retryPost: proc.input(z.object({ postId: z.string() })).mutation(async ({ ctx, input }) => {
+      return retryPostById(ctx.env, input.postId, ctx.user.id);
     }),
   }),
 

@@ -132,3 +132,91 @@ export async function generateImageForTopic(input: GenImageInput): Promise<{
     prompt: input.prompt,
   };
 }
+
+// ─── Template-scope bg preview ─────────────────────────────────────────
+// Lighter-weight wrapper used only by the dashboard's "preview" button on
+// TemplateDetail. Uses the same Replicate model + R2 store, but does NOT
+// touch topic_assets — the preview is template-global. Output is stored
+// under templates/<slug>/ so a second preview call simply overwrites the
+// existing key (modulo timestamp, kept for cache busting).
+
+export interface GenTemplatePreviewInput {
+  env: Env;
+  userId: string;
+  templateSlug: string;
+  prompt: string;
+  aspect: "1:1" | "3:2" | "2:3";
+}
+
+export async function generateTemplatePreview(input: GenTemplatePreviewInput): Promise<{
+  r2Key: string;
+  url: string;
+  prompt: string;
+}> {
+  const token = input.env.REPLICATE_API_TOKEN;
+  if (!token) throw new Error("REPLICATE_API_TOKEN not configured");
+
+  const body = {
+    input: {
+      prompt: input.prompt,
+      aspect_ratio: input.aspect,
+      number_of_images: 1,
+      quality: "high",
+      output_format: "webp",
+      output_compression: 90,
+      background: "auto",
+      moderation: "auto",
+      user_id: input.userId,
+    },
+  };
+
+  const startRes = await fetch(`${REPLICATE_BASE}/models/${MODEL}/predictions`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${token}`,
+      "content-type": "application/json",
+      prefer: "wait=60",
+    },
+    body: JSON.stringify(body),
+  });
+  const startText = await startRes.text();
+  if (!startRes.ok) throw new Error(`Replicate ${startRes.status}: ${startText.slice(0, 500)}`);
+  let prediction = JSON.parse(startText) as ReplicatePrediction;
+
+  const deadline = Date.now() + 5 * 60 * 1000;
+  while (
+    prediction.status !== "succeeded" &&
+    prediction.status !== "failed" &&
+    prediction.status !== "canceled" &&
+    Date.now() < deadline
+  ) {
+    await new Promise((r) => setTimeout(r, 2500));
+    const pollUrl = prediction.urls?.get ?? `${REPLICATE_BASE}/predictions/${prediction.id}`;
+    const pollRes = await fetch(pollUrl, { headers: { authorization: `Bearer ${token}` } });
+    if (!pollRes.ok) throw new Error(`Replicate poll ${pollRes.status}: ${(await pollRes.text()).slice(0, 200)}`);
+    prediction = (await pollRes.json()) as ReplicatePrediction;
+  }
+  if (prediction.status !== "succeeded") {
+    throw new Error(`Replicate prediction ${prediction.id} ended ${prediction.status}: ${prediction.error ?? ""}`);
+  }
+  const outputUrl = prediction.output?.[0];
+  if (!outputUrl) throw new Error(`Replicate prediction ${prediction.id} returned no output`);
+
+  const dl = await fetch(outputUrl);
+  if (!dl.ok) throw new Error(`download ${outputUrl} → ${dl.status}`);
+  const bytes = await dl.arrayBuffer();
+  const mime = dl.headers.get("content-type") ?? "image/webp";
+  const ext = mime.includes("png") ? "png" : mime.includes("jpeg") ? "jpg" : "webp";
+
+  // Timestamped key — lets the Img cache-bust without us tracking versions.
+  const r2Key = `templates/${input.templateSlug}/preview-bg-${Date.now()}.${ext}`;
+  await input.env.MEDIA.put(r2Key, bytes, {
+    httpMetadata: { contentType: mime, cacheControl: "public, max-age=31536000" },
+  });
+
+  return {
+    r2Key,
+    url: `${input.env.R2_PUBLIC_BASE}/${r2Key}`,
+    prompt: input.prompt,
+  };
+}

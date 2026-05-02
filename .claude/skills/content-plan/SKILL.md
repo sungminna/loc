@@ -82,10 +82,23 @@ What slide 1 must NOT be:
 - Use stat slides where the data is genuinely surprising. Don't invent numbers; cite them from research.md only when they are real.
 - Don't repeat slide 1's hook in slide 2 — the viewer already paid attention; reward them with new info.
 
-### Slide 5 = action
-- Tell the viewer what to physically do this week. Not "remember this" — that's not actionable.
-- Good: "오늘 자기 전 10분만 시도해보기" / "내일 아침 첫 1시간 Save this"
-- Bad: "감사합니다" / "도움이 됐길 바라요"
+### Slide 5 = action + conversion
+The last slide must do TWO jobs simultaneously: tell the viewer what to do **and** trigger one of save / follow / comment. Pick whichever fits — don't try all at once.
+
+- **Save-bait** (works best for stat-heavy + how-to content):
+  - "다시 찾기 어려운 내용이라 저장해두세요" / "다음에 헷갈릴 때 꺼내 보기 — 🔖"
+  - Set `emphasis: "🔖"` on the slide.
+- **Comment-bait** (works best for opinion / take / comparison):
+  - Specific question that demands a one-word answer: "여러분은 X파 vs Y파?", "지금 가지고 있는 것은?"
+  - Avoid generic "어떻게 생각하세요?" — too low-stakes to motivate a reply.
+- **Follow-bait** (works best when the run is part of a recurring series):
+  - "매일 아침 8시, 오늘처럼 정리합니다 — 팔로우" / "월요일마다 한 주 핵심 한 장으로"
+  - Implies the account is a routine the viewer should subscribe to. Only use when the topic actually runs daily/weekly.
+
+What slide 5 must NOT be:
+- "감사합니다 / 도움이 됐길 바라요" (no algorithmic value)
+- "공유 좋아요 댓글 부탁드려요" (everyone's done it; reads as desperate)
+- A second hook ("다음 편에서 더 충격적인…") — it's anti-pattern; viewers feel cheated when the current run had no payoff.
 
 ### Slide 6 (optional) = identity / save prompt
 - Memorable line tied to the persona, OR an explicit "🔖 저장하고 다시 보기" with `emphasis: "🔖"`.
@@ -146,6 +159,83 @@ Instagram's 2026 ranking penalizes recycled content. Don't:
 - Use stock viral phrasing verbatim ("Wait for it...", "POV:", "Tell me without telling me…").
 - Reuse a hook from a previous run on this topic — diversify across runs.
 - Produce a slide deck that's just a list of "5 tips for X". Stories beat lists. Pick a single concrete experience.
+
+## Hook formulas (pick ONE per run, never combine)
+
+These are battle-tested patterns from the top KR creators in their respective domains. Match the formula to the domain — finance audiences want signal, AI audiences want comparison, trend audiences want belonging.
+
+**Finance / 투자**:
+- "기관이 지난주에 산 ___" — institutional flow signal
+- "왜 ___ 가 갑자기 오르내렸나" — causal explainer
+- "신용잔고 ___조 돌파, 다음에 올 일" — leading indicator
+- "워런 버핏이 최근에 정리한 종목" — authority-anchored news
+- "코스피 ___% 빠지면 무엇이 무너지나" — scenario stress-test
+- AVOID: "이 종목 사세요" / "지금이 마지막 기회" — both legally risky AND algorithm-suppressed.
+
+**AI / 기술**:
+- "Claude 4.7 vs GPT-5 1주일 써본 결과" — direct comparison
+- "OpenAI가 어제 공개한 ___" — 24h news urgency
+- "이 prompt 하나면 ___" — single-tool revelation
+- "AI 잘 쓰는 사람 vs 못 쓰는 사람의 ___" — competence signaling
+- "___ 업무가 30분에서 3분으로" — time-compression with measured number
+- AVOID: "AI 모르면 도태됩니다" — fear-mongering reads as desperate; "10배 빨라졌어요" without measurement; vague "혁신".
+
+**부동산 / 거시경제**:
+- "전세 잡기 전에 ___" — pre-decision warning
+- "지난주 ___ 지역 거래량 ___배" — geographic + numeric
+- "대출 규제 바뀌면 무엇이 달라지나" — policy-shift impact
+- AVOID: "지금이 매수 타이밍" / 가격 전망 단정 — both legally risky.
+
+**트렌드 / 문화**:
+- "요즘 ___ 검색량 ___배" — data-anchored trend
+- "Z세대가 ___ 를 안 쓰는 이유" — generational shift
+- "한 주 동안 가장 많이 ___ 한 곳" — listicle with payoff
+- AVOID: "충격적인 ___" / "미친 ___" — these used to work but now signal low-effort to the algorithm.
+
+**개발자 / 코딩**:
+- "1년 동안 ___ 했더니" — long-form personal credibility
+- "Cursor vs Claude Code 1주일 결과" — A/B with measurable outcome
+- "PR 머지까지 ___분 줄인 워크플로" — measurable productivity claim
+- AVOID: 코드 자체를 슬라이드에 넣기 (read-time too long); 도구 광고처럼 보이는 톤.
+
+## Legal safety rails (KR target audience)
+
+Korean financial / medical / real-estate content is heavily regulated. Hard rules — never violate, regardless of persona instruction:
+
+- **Finance / 투자**: never recommend specific stocks ("매수하세요" / "지금 사세요"), never give price targets ("OOO원 갑니다"), never characterize as "기회" / "확실". Always include a one-line 면책: "투자 권유 아님. 본인 판단·책임."
+- **부동산**: same rule. No price predictions, no recommended purchases. "정책 발표 ___ → 일반적으로 ___" 식 객관 서술만.
+- **의료/건강**: 효능 단정 금지. "도움이 될 수 있습니다" 는 가능, "치료됩니다" 는 금지.
+- **인물 평가**: 실명을 부정적 맥락에 쓰지 않는다. 비교는 회사/제품으로. (예: 카카오 vs 네이버 OK, "OOO 대표가 잘못했다" NO).
+- **수치 출처**: 모든 stat 슬라이드는 출처를 갖고 있어야 한다. 출처 없는 숫자는 만들지 말 것 (research.md 에 없으면 drop). 캡션 마지막에 "출처: __" 한 줄.
+
+If a hook formula above conflicts with these rails for the current topic, drop the hook and pick another. The rails always win.
+
+## Caption conversion mechanics (IG vs Threads, different jobs)
+
+The Reels caption and the Threads body do **different** algorithmic jobs — write them differently.
+
+**IG Reels caption** — the goal is a *deep view* (rewatch + tap-into-caption). Structure:
+- Line 1: punchline that delivers slide 1's curiosity gap. Not a teaser of the video; an actual payoff complement that makes someone stop scrolling.
+- Line 2-3: 1-2 lines elaborating the take with a specific number from the brief.
+- Line 4 (optional): a reference (출처 / 자료) — credibility.
+- Line 5: ONE specific CTA — save / comment / follow. Match it to slide 5's choice.
+- NO hashtags inside (publisher appends).
+- NO greeting / NO "오늘은" opener.
+
+**Threads body** — the goal is *replies + reposts*. Structure:
+```
+<hook claim — bold one-liner that stands alone>
+
+<context: why this matters now (1 sentence)>
+
+<position: your take — slightly opinionated but factually grounded>
+
+<question: a specific reply prompt, NOT generic "어떻게 생각하세요?">
+```
+- Line breaks matter. Use them.
+- Threads format is **conversational opinion**, IG is **packaged information**. Same topic, different posture.
+- Threads questions that work: "여러분은 어느 쪽 쓰세요?", "지금 들고 계신 종목은?" (재테크 관련시 면책 한 줄 추가), "다른 의견 환영합니다 — 어떤 시나리오 보고 계세요?"
+- Avoid: "공감되시나요?", "댓글로 의견 부탁드려요" — too low-energy.
 
 ## Self-critique loop (mandatory)
 

@@ -203,13 +203,18 @@ const StatCard: React.FC<{ stat: NonNullable<ReelVideoScene["stat"]>; accent: st
   const target = Number(stat.value) || 0;
   const decimals = stat.value.includes(".") ? 1 : 0;
   const t = interpolate(frame, [12, 28], [0, 1], { extrapolateRight: "clamp" });
+  // 3D flip-in — card rotates from rotateY(40deg) so it feels like it's being
+  // placed onto the scene, not just sliding up.
+  const ry = (1 - t) * 40;
   return (
     <div style={{
       position: "absolute", top: "32%", right: 80,
       background: "rgba(0,0,0,0.55)", backdropFilter: "blur(20px)",
       border: `1.5px solid ${accent}66`, borderRadius: 28,
       padding: "28px 36px", textAlign: "right", minWidth: 320,
-      opacity: t, transform: `translateY(${(1 - t) * 40}px)`,
+      opacity: t,
+      transform: `perspective(1400px) rotateY(${ry}deg) translateY(${(1 - t) * 40}px)`,
+      transformOrigin: "right center",
       boxShadow: `0 20px 60px rgba(0,0,0,0.5)`,
     }}>
       <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: 4, color: accent, textTransform: "uppercase" }}>
@@ -274,7 +279,7 @@ const ProgressBar: React.FC<{ offsets: number[]; accent: string }> = ({ offsets,
 
 const BrandWatermark: React.FC<{ brand: { handle: string; name: string }; accent: string }> = ({ brand, accent }) => (
   <div style={{
-    position: "absolute", bottom: 110, left: 0, right: 0,
+    position: "absolute", bottom: 140, left: 0, right: 0,
     display: "flex", justifyContent: "center", alignItems: "center", gap: 16,
     fontSize: 22, color: "rgba(255,255,255,0.85)", letterSpacing: 4,
     textShadow: "0 2px 10px rgba(0,0,0,0.6)",

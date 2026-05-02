@@ -22,12 +22,13 @@ export const defaultQuoteSpotlightProps: CardSlideProps = {
   ],
 };
 
-export const QuoteSpotlight: React.FC<CardSlideProps> = ({ brand, lang, slides, audioUrl, attribution }) => {
+export const QuoteSpotlight: React.FC<CardSlideProps> = ({ brand, lang, slides, audioUrl, attribution, accent }) => {
   const { fps } = useVideoConfig();
   const font = lang === "ko" ? theme.fontFamilyKo : theme.fontFamilyEn;
   const serif = theme.fontFamilySerif;
   const list = slides.length ? slides : defaultQuoteSpotlightProps.slides;
   const palette = palettes.sunrise;
+  const accentColor = accent ?? palette.accent;
 
   return (
     <AbsoluteFill style={{ background: palette.bg, color: palette.text, fontFamily: font }}>
@@ -35,11 +36,11 @@ export const QuoteSpotlight: React.FC<CardSlideProps> = ({ brand, lang, slides, 
 
       {list.map((s, i) => (
         <Sequence key={i} from={i * SLIDE_FRAMES} durationInFrames={SLIDE_FRAMES + 12}>
-          <QuoteSlide slide={s} index={i} total={list.length} fps={fps} accent={palette.accent} serif={serif} sans={font} />
+          <QuoteSlide slide={s} index={i} total={list.length} fps={fps} accent={accentColor} serif={serif} sans={font} />
         </Sequence>
       ))}
 
-      <FloatingBrand brand={brand} sans={font} />
+      <FloatingBrand brand={brand} sans={font} accent={accentColor} />
       {attribution ? <Attribution text={attribution} sans={font} /> : null}
     </AbsoluteFill>
   );
@@ -105,7 +106,7 @@ const QuoteSlide: React.FC<{ slide: ReelSlide; index: number; total: number; fps
 
       {slide.emphasis ? (
         <div style={{
-          position: "absolute", bottom: 360, right: 96, fontSize: 160,
+          position: "absolute", bottom: 400, right: 96, fontSize: 160,
           opacity, transform: `rotate(${-8 + interpolate(enter, [0, 1], [-12, 0])}deg)`,
         }}>
           {slide.emphasis}
@@ -114,7 +115,7 @@ const QuoteSlide: React.FC<{ slide: ReelSlide; index: number; total: number; fps
 
       {slide.attribution ? (
         <div style={{
-          position: "absolute", bottom: 240, left: 96,
+          position: "absolute", bottom: 280, left: 96,
           opacity, transform: `translateX(${(1 - enter) * -30}px)`,
         }}>
           <div style={{ width: 80, height: 3, background: accent, marginBottom: 22 }} />
@@ -127,12 +128,13 @@ const QuoteSlide: React.FC<{ slide: ReelSlide; index: number; total: number; fps
   );
 };
 
-const FloatingBrand: React.FC<{ brand: { handle: string; name: string }; sans: string }> = ({ brand, sans }) => (
+const FloatingBrand: React.FC<{ brand: { handle: string; name: string }; sans: string; accent: string }> = ({ brand, sans, accent }) => (
   <div style={{
-    position: "absolute", bottom: 96, left: 0, right: 0,
-    display: "flex", justifyContent: "center", gap: 14,
+    position: "absolute", bottom: 140, left: 0, right: 0,
+    display: "flex", justifyContent: "center", gap: 14, alignItems: "center",
     fontFamily: sans, fontSize: 22, color: "rgba(26,16,20,0.7)", letterSpacing: 3,
   }}>
+    <span style={{ width: 6, height: 6, background: accent, borderRadius: 3 }} />
     <span style={{ fontWeight: 800, color: "#1a1014" }}>{brand.name.toUpperCase()}</span>
     <span>·</span>
     <span>{brand.handle}</span>

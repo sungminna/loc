@@ -6,7 +6,7 @@
 import { AbsoluteFill, Audio, Img, Sequence, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
 import type { CardSlideProps, ReelSlide } from "../types";
 import { palettes, theme } from "../theme";
-import { chromaShadow, grainPulse } from "../animations";
+import { chromaShadow, grainPulse, pseudoRandom } from "../animations";
 
 const SLIDE_FRAMES = 96;
 
@@ -22,39 +22,40 @@ export const defaultRetroVHSProps: CardSlideProps = {
   ],
 };
 
-export const RetroVHS: React.FC<CardSlideProps> = ({ brand, lang, slides, audioUrl, attribution }) => {
+export const RetroVHS: React.FC<CardSlideProps> = ({ brand, lang, slides, audioUrl, attribution, accent }) => {
   const { fps } = useVideoConfig();
   const font = lang === "ko" ? theme.fontFamilyKo : theme.fontFamilyEn;
   const mono = theme.fontFamilyMono;
   const list = slides.length ? slides : defaultRetroVHSProps.slides;
   const palette = palettes.vhs;
+  const accentColor = accent ?? palette.accent;
 
   return (
     <AbsoluteFill style={{ background: palette.bg, color: palette.text, fontFamily: font, overflow: "hidden" }}>
       {audioUrl ? <Audio src={audioUrl} volume={0.45} /> : null}
 
-      <CRTBackground />
+      <CRTBackground accent={accentColor} />
 
       {list.map((s, i) => (
         <Sequence key={i} from={i * SLIDE_FRAMES} durationInFrames={SLIDE_FRAMES + 12}>
-          <VHSSlide slide={s} index={i} total={list.length} fps={fps} accent={palette.accent} mono={mono} />
+          <VHSSlide slide={s} index={i} total={list.length} fps={fps} accent={accentColor} mono={mono} />
         </Sequence>
       ))}
 
       <ScanLines />
-      <BrandHud brand={brand} mono={mono} accent={palette.accent} />
+      <BrandHud brand={brand} mono={mono} accent={accentColor} />
       {attribution ? <Attribution text={attribution} mono={mono} /> : null}
     </AbsoluteFill>
   );
 };
 
-const CRTBackground: React.FC = () => {
+const CRTBackground: React.FC<{ accent: string }> = ({ accent }) => {
   const frame = useCurrentFrame();
   return (
     <>
       <div style={{
         position: "absolute", inset: 0,
-        background: "radial-gradient(ellipse at center, rgba(255,45,146,0.18) 0%, transparent 70%)",
+        background: `radial-gradient(ellipse at center, ${accent}2e 0%, transparent 70%)`,
         opacity: grainPulse(frame, 0.85, 0.1, 24),
       }} />
       <div style={{
@@ -71,9 +72,11 @@ const VHSSlide: React.FC<{ slide: ReelSlide; index: number; total: number; fps: 
   const exit = interpolate(frame, [SLIDE_FRAMES - 14, SLIDE_FRAMES + 10], [1, 0], { extrapolateRight: "clamp" });
   const opacity = enter * exit;
 
-  // glitch jitter every ~12 frames for the first 24 frames
+  // Glitch jitter every ~6 frames for the first 24 frames. Math.random()
+  // is non-deterministic per render call which made server renders diverge
+  // from previews — use a frame-seeded pseudo-random instead.
   const glitchActive = frame < 24 && frame % 6 === 0;
-  const jitter = glitchActive ? (Math.random() - 0.5) * 14 : 0;
+  const jitter = glitchActive ? (pseudoRandom(frame, index + 1) - 0.5) * 14 : 0;
 
   return (
     <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", padding: 80 }}>
@@ -157,7 +160,7 @@ const ScanLines: React.FC = () => (
 
 const BrandHud: React.FC<{ brand: { handle: string; name: string }; mono: string; accent: string }> = ({ brand, mono, accent }) => (
   <div style={{
-    position: "absolute", bottom: 70, left: 80, right: 80,
+    position: "absolute", bottom: 140, left: 80, right: 80,
     display: "flex", justifyContent: "space-between", alignItems: "center",
     fontFamily: mono, fontSize: 20, letterSpacing: 5, color: "rgba(248,233,255,0.8)",
   }}>

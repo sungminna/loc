@@ -21,11 +21,12 @@ export const defaultMinimalGridProps: CardSlideProps = {
   ],
 };
 
-export const MinimalGrid: React.FC<CardSlideProps> = ({ brand, lang, slides, audioUrl, attribution }) => {
+export const MinimalGrid: React.FC<CardSlideProps> = ({ brand, lang, slides, audioUrl, attribution, accent }) => {
   const { fps } = useVideoConfig();
   const font = lang === "ko" ? theme.fontFamilyKo : theme.fontFamilyEn;
   const list = slides.length ? slides : defaultMinimalGridProps.slides;
   const palette = palettes.ink;
+  const accentColor = accent ?? palette.accent;
 
   return (
     <AbsoluteFill style={{ background: palette.bg, color: palette.text, fontFamily: font }}>
@@ -34,11 +35,11 @@ export const MinimalGrid: React.FC<CardSlideProps> = ({ brand, lang, slides, aud
 
       {list.map((s, i) => (
         <Sequence key={i} from={i * SLIDE_FRAMES} durationInFrames={SLIDE_FRAMES + 12}>
-          <MinimalSlide slide={s} index={i} total={list.length} fps={fps} accent={palette.accent} />
+          <MinimalSlide slide={s} index={i} total={list.length} fps={fps} accent={accentColor} />
         </Sequence>
       ))}
 
-      <Footer brand={brand} attribution={attribution} />
+      <Footer brand={brand} attribution={attribution} accent={accentColor} />
     </AbsoluteFill>
   );
 };
@@ -52,18 +53,22 @@ const MinimalSlide: React.FC<{ slide: ReelSlide; index: number; total: number; f
   return (
     <AbsoluteFill>
       {slide.bgImageUrl ? (
+        // Pulled to the upper-right (576x576) so it doesn't collide with the
+        // 280px index sitting at left:96. Previous 720x720 at right:96 began
+        // at left:264 and overlapped the digits.
         <Img src={slide.bgImageUrl} style={{
-          position: "absolute", top: 96, right: 96, width: 720, height: 720,
-          objectFit: "cover", opacity: 0.85 * opacity,
+          position: "absolute", top: 120, right: 96, width: 576, height: 576,
+          objectFit: "cover", opacity: 0.82 * opacity,
           clipPath: maskWipe(frame, 24, "bottom"),
           filter: "grayscale(40%) contrast(1.05)",
         }} />
       ) : null}
 
-      {/* huge index */}
+      {/* huge index — slightly narrower so two digits fit safely under
+          the bg image's left edge (576+96 = right 672, index ends ~340) */}
       <div style={{
-        position: "absolute", left: 96, top: 240,
-        fontSize: 280, fontWeight: 200, lineHeight: 1, color: accent,
+        position: "absolute", left: 96, top: 260,
+        fontSize: 240, fontWeight: 200, lineHeight: 1, color: accent,
         opacity: opacity * 0.95,
         transform: `translateY(${(1 - enter) * 40}px)`,
         fontFeatureSettings: "'tnum'",
@@ -73,14 +78,14 @@ const MinimalSlide: React.FC<{ slide: ReelSlide; index: number; total: number; f
 
       {/* hairline below index */}
       <div style={{
-        position: "absolute", left: 96, top: 560,
+        position: "absolute", left: 96, top: 540,
         height: 2, background: accent,
         width: interpolate(enter, [0, 1], [0, 380]),
       }} />
 
       {/* category */}
       <div style={{
-        position: "absolute", left: 96, top: 600,
+        position: "absolute", left: 96, top: 580,
         fontSize: 24, letterSpacing: 8, fontWeight: 700, color: "rgba(255,255,255,0.65)",
         textTransform: "uppercase", opacity,
       }}>
@@ -127,19 +132,22 @@ const GridLines: React.FC = () => (
   </svg>
 );
 
-const Footer: React.FC<{ brand: { handle: string; name: string }; attribution?: string }> = ({ brand, attribution }) => (
+const Footer: React.FC<{ brand: { handle: string; name: string }; attribution?: string; accent: string }> = ({ brand, attribution, accent }) => (
   <>
     <div style={{
-      position: "absolute", bottom: 80, left: 96, right: 96,
+      position: "absolute", bottom: 140, left: 96, right: 96,
       display: "flex", justifyContent: "space-between", alignItems: "center",
       fontSize: 22, letterSpacing: 5, color: "rgba(255,255,255,0.6)",
     }}>
-      <span style={{ fontWeight: 800, color: "#fff" }}>{brand.name.toUpperCase()}</span>
+      <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <span style={{ width: 6, height: 6, background: accent, borderRadius: 3 }} />
+        <span style={{ fontWeight: 800, color: "#fff" }}>{brand.name.toUpperCase()}</span>
+      </span>
       <span>{brand.handle}</span>
     </div>
     {attribution ? (
       <div style={{
-        position: "absolute", bottom: 28, left: 0, right: 0, textAlign: "center",
+        position: "absolute", bottom: 60, left: 0, right: 0, textAlign: "center",
         fontSize: 14, color: "rgba(255,255,255,0.35)",
       }}>{attribution}</div>
     ) : null}

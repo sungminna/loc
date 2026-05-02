@@ -24,14 +24,15 @@ export const defaultNeoBrutalismProps: CardSlideProps = {
   ],
 };
 
-export const NeoBrutalism: React.FC<CardSlideProps> = ({ brand, lang, slides, audioUrl, attribution }) => {
+export const NeoBrutalism: React.FC<CardSlideProps> = ({ brand, lang, slides, audioUrl, attribution, accent }) => {
   const { fps } = useVideoConfig();
   const font = lang === "ko" ? theme.fontFamilyKo : theme.fontFamilyEn;
   const list = slides.length ? slides : defaultNeoBrutalismProps.slides;
   const palette = palettes.brutalist;
+  const accentColor = accent ?? palette.accent;
 
   return (
-    <AbsoluteFill style={{ background: palette.bg, color: palette.text, fontFamily: font }}>
+    <AbsoluteFill style={{ background: palette.bg, color: palette.text, fontFamily: font, perspective: "1600px" }}>
       {audioUrl ? <Audio src={audioUrl} volume={0.45} /> : null}
 
       {/* checker pattern bg */}
@@ -44,7 +45,7 @@ export const NeoBrutalism: React.FC<CardSlideProps> = ({ brand, lang, slides, au
 
       {list.map((s, i) => (
         <Sequence key={i} from={i * SLIDE_FRAMES} durationInFrames={SLIDE_FRAMES + 12}>
-          <BrutalSlide slide={s} index={i} total={list.length} fps={fps} accent={palette.accent} />
+          <BrutalSlide slide={s} index={i} total={list.length} fps={fps} accent={accentColor} />
         </Sequence>
       ))}
 
@@ -97,13 +98,17 @@ const BrutalSlide: React.FC<{ slide: ReelSlide; index: number; total: number; fp
         </div>
       ) : null}
 
-      {/* headline card */}
+      {/* headline card — stacked box-shadow gives the brutalist depth without
+          adding a sibling element that would break flex centering. The 3D
+          translateZ pop only kicks in once the card has settled. */}
       <div style={{
         background: "white", color: "black",
-        border: "10px solid black", boxShadow: "20px 20px 0 black",
+        border: "10px solid black",
+        boxShadow: `12px 12px 0 ${accent}, 24px 24px 0 black`,
         padding: "60px 56px", maxWidth: 880,
         textAlign: "left",
-        transform: `rotate(${tilt}deg) translateY(${(1 - enter) * 80}px)`,
+        transform: `perspective(1400px) rotate(${tilt}deg) rotateX(${(1 - enter) * 18}deg) translateY(${(1 - enter) * 80}px) translateZ(${enter * 30}px)`,
+        transformStyle: "preserve-3d",
         opacity,
       }}>
         <h1 style={{
@@ -142,7 +147,7 @@ const BrutalSlide: React.FC<{ slide: ReelSlide; index: number; total: number; fp
 
 const BrandPill: React.FC<{ brand: { handle: string; name: string } }> = ({ brand }) => (
   <div style={{
-    position: "absolute", bottom: 80, left: 0, right: 0,
+    position: "absolute", bottom: 140, left: 0, right: 0,
     display: "flex", justifyContent: "center",
   }}>
     <div style={{

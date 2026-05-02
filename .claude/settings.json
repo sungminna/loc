@@ -26,6 +26,5 @@
   "env": {
     "LOC_ARTIFACT_DIR": "data/runs",
     "BUN_INSTALL": "/root/.bun"
-  },
-  "model": "claude-sonnet-4-6"
+  }
 }

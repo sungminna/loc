@@ -21,14 +21,29 @@ export {};
 //     topic via the dashboard once the accounts exist.
 //
 // Safe to re-run — INSERT OR IGNORE skips topics whose id already exists.
+//
+// Two modes:
+//   1) Normal (uses CF REST API):
+//        CLOUDFLARE_ACCOUNT_ID=… D1_DATABASE_ID=… CLOUDFLARE_API_TOKEN=… \
+//          USER_EMAIL=you@example.com bun scripts/seed-topics-ko.ts
+//   2) Emit-SQL (no CF token needed; pipe into wrangler):
+//        USER_ID=u_abc EMIT_SQL=1 bun scripts/seed-topics-ko.ts > /tmp/topics.sql
+//        bunx wrangler d1 execute loc-app --remote --file=/tmp/topics.sql
 
-const accountId = required("CLOUDFLARE_ACCOUNT_ID");
-const databaseId = required("D1_DATABASE_ID");
-const token = required("CLOUDFLARE_API_TOKEN");
+const EMIT_SQL = process.env.EMIT_SQL === "1";
+
+const accountId = EMIT_SQL ? "" : required("CLOUDFLARE_ACCOUNT_ID");
+const databaseId = EMIT_SQL ? "" : required("D1_DATABASE_ID");
+const token = EMIT_SQL ? "" : required("CLOUDFLARE_API_TOKEN");
 
 const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database/${databaseId}/query`;
 
 async function d1(sql: string, params: unknown[]): Promise<unknown[]> {
+  if (EMIT_SQL) {
+    // In EMIT_SQL mode we don't actually run queries — except resolveUserId,
+    // which for EMIT_SQL we bypass by requiring USER_ID directly.
+    throw new Error("d1() should not be called in EMIT_SQL mode");
+  }
   const res = await fetch(url, {
     method: "POST",
     headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
@@ -42,7 +57,7 @@ async function d1(sql: string, params: unknown[]): Promise<unknown[]> {
 }
 
 const userId = await resolveUserId();
-console.log(`▣ Seeding topics for user ${userId}\n`);
+if (!EMIT_SQL) console.log(`▣ Seeding topics for user ${userId}\n`);
 
 interface TopicSeed {
   id: string;
@@ -350,38 +365,47 @@ const TOPICS: TopicSeed[] = [
 
 // ─── Insert ────────────────────────────────────────────────────────────
 
+const INSERT_SQL = `INSERT OR IGNORE INTO topics
+  (id, user_id, name, description, lang, persona_prompt, source_urls,
+   target_accounts, template_slugs, audio_prefs, cron, daily_run_cap,
+   cost_cap_usd, enabled, image_style_prompt, image_mode, threads_format,
+   hashtag_mode, fixed_hashtags, created_at, updated_at)
+ VALUES (?, ?, ?, ?, ?, ?, ?, '{}', ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)`;
+
+function paramsFor(t: TopicSeed): unknown[] {
+  return [
+    t.id, userId, t.name, t.description, t.lang, t.personaPrompt,
+    JSON.stringify(t.sourceUrls),
+    JSON.stringify(t.templateSlugs),
+    JSON.stringify({ moodTags: t.audioMoods, allowedSources: ["ncs", "upload"] }),
+    t.cron, t.dailyRunCap, t.costCapUsd, t.imageStylePrompt, t.imageMode,
+    t.threadsFormat, t.hashtagMode, JSON.stringify(t.fixedHashtags),
+    Date.now(), Date.now(),
+  ];
+}
+
+if (EMIT_SQL) {
+  // Inline params so wrangler d1 execute --file can run the result
+  // without bound parameters.
+  const quote = (v: unknown): string => {
+    if (v === null || v === undefined) return "NULL";
+    if (typeof v === "number") return String(v);
+    if (typeof v === "boolean") return v ? "1" : "0";
+    return `'${String(v).replace(/'/g, "''")}'`;
+  };
+  for (const t of TOPICS) {
+    const params = paramsFor(t);
+    let i = 0;
+    const sql = INSERT_SQL.replace(/\?/g, () => quote(params[i++]));
+    console.log(sql.replace(/\s+/g, " ").trim() + ";");
+  }
+  process.exit(0);
+}
+
 let ok = 0, fail = 0;
 for (const t of TOPICS) {
   try {
-    await d1(
-      `INSERT OR IGNORE INTO topics
-        (id, user_id, name, description, lang, persona_prompt, source_urls,
-         target_accounts, template_slugs, audio_prefs, cron, daily_run_cap,
-         cost_cap_usd, enabled, image_style_prompt, image_mode, threads_format,
-         hashtag_mode, fixed_hashtags, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, '{}', ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        t.id,
-        userId,
-        t.name,
-        t.description,
-        t.lang,
-        t.personaPrompt,
-        JSON.stringify(t.sourceUrls),
-        JSON.stringify(t.templateSlugs),
-        JSON.stringify({ moodTags: t.audioMoods, allowedSources: ["ncs", "upload"] }),
-        t.cron,
-        t.dailyRunCap,
-        t.costCapUsd,
-        t.imageStylePrompt,
-        t.imageMode,
-        t.threadsFormat,
-        t.hashtagMode,
-        JSON.stringify(t.fixedHashtags),
-        Date.now(),
-        Date.now(),
-      ],
-    );
+    await d1(INSERT_SQL, paramsFor(t));
     ok++;
     console.log(`  ✓ ${t.name}`);
   } catch (e) {

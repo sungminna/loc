@@ -2,25 +2,22 @@
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "permissions": {
     "defaultMode": "bypassPermissions",
-    "allow": [
-      "Bash",
-      "Read",
-      "Write",
-      "Edit",
-      "Glob",
-      "Grep",
-      "WebFetch",
-      "WebSearch",
-      "Skill"
-    ],
+    "allow": [],
     "deny": [
       "Bash(rm -rf /)",
       "Bash(rm -rf /*)",
       "Bash(rm -rf ~)",
+      "Bash(rm -rf $HOME)",
+      "Bash(rm -rf /etc:*)",
+      "Bash(rm -rf /usr:*)",
+      "Bash(rm -rf /var:*)",
       "Bash(mkfs:*)",
       "Bash(dd if=/dev/*)",
       "Bash(shutdown:*)",
-      "Bash(reboot:*)"
+      "Bash(reboot:*)",
+      "Bash(halt:*)",
+      "Bash(poweroff:*)",
+      "Bash(kill -9 1)"
     ]
   },
   "env": {

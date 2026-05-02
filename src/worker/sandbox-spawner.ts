@@ -85,7 +85,7 @@ export async function spawnSandboxRun(
     //    WebFetch, WebSearch, Skill`) lets it call sub-skills (image-gen
     //    etc.) once invoked.
     const prompt = [
-      `You are running headlessly inside a Cloudflare sandbox container. Do NOT reply with prose — only invoke tools.`,
+      `You are running headlessly inside a Cloudflare sandbox container with FULL AUTONOMY. There is no human to ask. Do NOT reply with prose. Do NOT pause for clarification or confirmation. Make every decision independently — when in doubt, pick a defensible default and move forward; when something fails, log a short stderr message and continue with the next viable path. Permissions are pre-granted; every tool you can see is yours to use.`,
       ``,
       `Use the Skill tool to invoke the "orchestrate-run" skill now. Pass these arguments verbatim:`,
       ``,
@@ -100,6 +100,8 @@ export async function spawnSandboxRun(
       `  2. On any uncaught failure, calling \`set-status … failed --error "<short msg>"\` and exiting non-zero.`,
       `  3. Ending with \`set-status … done\` on success.`,
       ``,
+      `Use any built-in tool you need (Bash, Read, Write, Edit, Glob, Grep, WebFetch, WebSearch, Skill, Task, TodoWrite, etc.) without hesitation. If a sub-step would normally prompt for permission, treat it as already approved and proceed.`,
+      ``,
       `If the run finishes without ever calling \`set-status done\`, the parent process will mark it failed. Begin by invoking the Skill tool — no preamble.`,
     ].join("\n");
 
@@ -112,18 +114,24 @@ export async function spawnSandboxRun(
     const PROMPT_PATH = "/workspace/.loc-prompt.txt";
     await sandbox.writeFile(PROMPT_PATH, prompt);
 
-    // Tool list + permission-mode are belt-and-suspenders alongside
-    // .claude/settings.json. Tools are passed as ONE comma-separated token
-    // so commander's variadic --allowed-tools doesn't accidentally
-    // consume the next flag.
+    // Permission flags only — no --allowed-tools whitelist on purpose.
+    // Under --permission-mode bypassPermissions the whitelist would be
+    // overridden anyway, but more importantly we WANT the model to have
+    // every built-in tool (Task, NotebookEdit, TodoWrite, etc.) available
+    // for full autonomy. Catastrophic Bash patterns (rm -rf /, mkfs,
+    // shutdown) are still blocked by .claude/settings.json `permissions.deny`
+    // — that hard block survives bypassPermissions.
+    //
+    // --permission-mode + --dangerously-skip-permissions are NOT redundant:
+    // the former sets the mode, the latter is the explicit "I mean it"
+    // circuit breaker. Both are appropriate for an ephemeral sandbox
+    // running as root with IS_SANDBOX=1.
     const result = await sandbox.exec(
-      // bypassPermissions = full autonomy. IS_SANDBOX=1 bypasses CLI's root check.
       `cd /workspace && cat ${PROMPT_PATH} | claude -p ` +
         `--output-format stream-json ` +
         `--verbose ` +
         `--permission-mode bypassPermissions ` +
-        `--dangerously-skip-permissions ` +
-        `--allowed-tools Bash,Read,Write,Edit,Glob,Grep,WebFetch,WebSearch,Skill`,
+        `--dangerously-skip-permissions`,
       { env: childEnv, timeout: CLAUDE_TIMEOUT_MS },
     );
 

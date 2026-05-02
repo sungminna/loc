@@ -72,34 +72,58 @@ export async function spawnSandboxRun(
       ...tokenEnv,
     };
 
-    // Headless Claude CLI needs an explicit Skill invocation here — a terse
-    // "run the orchestrate-run skill" prompt is interpreted conversationally
-    // (the model summarises what it WOULD do without actually invoking tools)
-    // and the run finishes in <1 minute with no brief and no assets. We tell
-    // it directly to load the skill file, follow every step, and never reply
-    // to the user — only call tools.
+    // Headless Claude CLI behaviour notes:
+    //  - Slash commands (`/orchestrate-run …`) are NOT expanded in -p mode,
+    //    so we cannot rely on the skill's slash-command form.
+    //  - A terse prompt like "Run the orchestrate-run skill" is interpreted
+    //    conversationally — the model summarises what it WOULD do without
+    //    actually invoking any tool (run finishes in <1 min, 29 input
+    //    tokens, no brief, no assets). To force an actual tool invocation
+    //    we lead with "Use the Skill tool to invoke …" — that maps 1:1 to
+    //    a Skill tool call with `skill: "orchestrate-run"`.
+    //  - The skill's frontmatter (`allowed-tools: Bash, Read, Write,
+    //    WebFetch, WebSearch, Skill`) lets it call sub-skills (image-gen
+    //    etc.) once invoked.
     const prompt = [
-      `You are running inside a sandbox container. Your job is to execute the orchestrate-run skill end-to-end for one autonomous content cycle. Do NOT reply with text — only call tools.`,
+      `You are running headlessly inside a Cloudflare sandbox container. Do NOT reply with prose — only invoke tools.`,
       ``,
-      `Context:`,
+      `Use the Skill tool to invoke the "orchestrate-run" skill now. Pass these arguments verbatim:`,
+      ``,
       `  runId=${runId}`,
       `  topicId=${topicId}`,
       `  userId=${userId}`,
       ``,
-      `Steps:`,
-      `1. Read .claude/skills/orchestrate-run/SKILL.md.`,
-      `2. Set the corresponding env vars in your shell: LOC_RUN_ID, LOC_TOPIC_ID, LOC_USER_ID. The Worker has already exported these but if a step needs them inline, use the values above.`,
-      `3. Walk every step of the skill in order: research → plan → image-gen → (video-gen if reel-video) → select-audio → render → publish.`,
-      `4. At every stage transition call db-cli set-status — this drives the dashboard's progress indicator.`,
-      `5. On any error, write a short message to stderr and call db-cli set-status \"$LOC_RUN_ID\" failed before exiting. Never silently skip a step.`,
-      `6. The final action MUST be db-cli set-status \"$LOC_RUN_ID\" done (success) or failed (error). The run will be marked failed by the parent process if you exit without calling set-status done.`,
+      `These values are also already exported as LOC_RUN_ID / LOC_TOPIC_ID / LOC_USER_ID in the shell, so any Bash step inside the skill can use the env vars directly.`,
       ``,
-      `Begin.`,
+      `The skill drives one full autonomous content cycle (research → content-plan → image-gen → video-gen if applicable → select-audio → render-reel → ig/threads publish). It is responsible for:`,
+      `  1. Calling \`bun src/sandbox/db-cli.ts set-status "$LOC_RUN_ID" <stage>\` BEFORE every stage transition so the dashboard reflects progress.`,
+      `  2. On any uncaught failure, calling \`set-status … failed --error "<short msg>"\` and exiting non-zero.`,
+      `  3. Ending with \`set-status … done\` on success.`,
+      ``,
+      `If the run finishes without ever calling \`set-status done\`, the parent process will mark it failed. Begin by invoking the Skill tool — no preamble.`,
     ].join("\n");
 
+    // Write the prompt to a file inside the sandbox and pipe it via cat
+    // rather than embedding in the shell command. JSON.stringify-into-shell
+    // turns \n into the literal backslash-n sequence (because bash double
+    // quotes don't interpret escape codes), which makes the prompt ugly
+    // and harder for the model to parse. Using a file preserves real
+    // newlines and sidesteps shell escape ambiguity entirely.
+    const PROMPT_PATH = "/workspace/.loc-prompt.txt";
+    await sandbox.writeFile(PROMPT_PATH, prompt);
+
+    // Tool list + permission-mode are belt-and-suspenders alongside
+    // .claude/settings.json. Tools are passed as ONE comma-separated token
+    // so commander's variadic --allowed-tools doesn't accidentally
+    // consume the next flag.
     const result = await sandbox.exec(
       // bypassPermissions = full autonomy. IS_SANDBOX=1 bypasses CLI's root check.
-      `cd /workspace && claude -p ${JSON.stringify(prompt)} --output-format stream-json --verbose --dangerously-skip-permissions`,
+      `cd /workspace && cat ${PROMPT_PATH} | claude -p ` +
+        `--output-format stream-json ` +
+        `--verbose ` +
+        `--permission-mode bypassPermissions ` +
+        `--dangerously-skip-permissions ` +
+        `--allowed-tools Bash,Read,Write,Edit,Glob,Grep,WebFetch,WebSearch,Skill`,
       { env: childEnv, timeout: CLAUDE_TIMEOUT_MS },
     );
 

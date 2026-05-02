@@ -72,10 +72,30 @@ export async function spawnSandboxRun(
       ...tokenEnv,
     };
 
-    const prompt =
-      `Run the orchestrate-run skill for runId=${runId} topicId=${topicId} userId=${userId}. ` +
-      `Follow the skill exactly. Update run status at every stage transition via db-cli. ` +
-      `Halt and report any error to stderr; never silently skip a step.`;
+    // Headless Claude CLI needs an explicit Skill invocation here — a terse
+    // "run the orchestrate-run skill" prompt is interpreted conversationally
+    // (the model summarises what it WOULD do without actually invoking tools)
+    // and the run finishes in <1 minute with no brief and no assets. We tell
+    // it directly to load the skill file, follow every step, and never reply
+    // to the user — only call tools.
+    const prompt = [
+      `You are running inside a sandbox container. Your job is to execute the orchestrate-run skill end-to-end for one autonomous content cycle. Do NOT reply with text — only call tools.`,
+      ``,
+      `Context:`,
+      `  runId=${runId}`,
+      `  topicId=${topicId}`,
+      `  userId=${userId}`,
+      ``,
+      `Steps:`,
+      `1. Read .claude/skills/orchestrate-run/SKILL.md.`,
+      `2. Set the corresponding env vars in your shell: LOC_RUN_ID, LOC_TOPIC_ID, LOC_USER_ID. The Worker has already exported these but if a step needs them inline, use the values above.`,
+      `3. Walk every step of the skill in order: research → plan → image-gen → (video-gen if reel-video) → select-audio → render → publish.`,
+      `4. At every stage transition call db-cli set-status — this drives the dashboard's progress indicator.`,
+      `5. On any error, write a short message to stderr and call db-cli set-status \"$LOC_RUN_ID\" failed before exiting. Never silently skip a step.`,
+      `6. The final action MUST be db-cli set-status \"$LOC_RUN_ID\" done (success) or failed (error). The run will be marked failed by the parent process if you exit without calling set-status done.`,
+      ``,
+      `Begin.`,
+    ].join("\n");
 
     const result = await sandbox.exec(
       // bypassPermissions = full autonomy. IS_SANDBOX=1 bypasses CLI's root check.
@@ -91,13 +111,27 @@ export async function spawnSandboxRun(
       : null;
 
     // The orchestrator skill is responsible for setting status=done|failed,
-    // but we reconcile here as a safety net: if the CLI crashed without
-    // updating, mark failed; if it succeeded but skipped the final set-status,
-    // mark done.
+    // but we reconcile here as a safety net.
+    //  - CLI crashed (non-zero exit) → failed
+    //  - CLI exited 0 AND skill called set-status done → trust it
+    //  - CLI exited 0 BUT status is still mid-pipeline → orchestrator
+    //    skipped its own terminal set-status: treat as failed so the
+    //    dashboard surfaces the partial run rather than masking it as
+    //    "done with no brief / no assets".
     const cur = await db.query.runs.findFirst({ where: eq(runs.id, runId) });
+    const IN_FLIGHT: ReadonlySet<RunStatus> = new Set([
+      "planned", "researching", "planning", "generating", "rendering", "publishing",
+    ]);
     const status: RunStatus = failed
       ? "failed"
-      : (cur?.status === "done" ? "done" : "done");
+      : cur?.status === "done"
+        ? "done"
+        : cur && IN_FLIGHT.has(cur.status)
+          ? "failed"
+          : (cur?.status ?? "failed");
+    const reconciledError = !failed && status === "failed"
+      ? `orchestrator exited cleanly but left status=${cur?.status ?? "unknown"} — skill did not call set-status done`
+      : null;
 
     await db.update(runs).set({
       claudeSessionId: totals.sessionId,
@@ -105,7 +139,7 @@ export async function spawnSandboxRun(
       tokensIn: totals.tokensIn,
       tokensOut: totals.tokensOut,
       status,
-      error: failed ? errorMessage?.slice(0, 4000) : null,
+      error: failed ? errorMessage?.slice(0, 4000) : reconciledError,
       finishedAt: new Date(),
     }).where(eq(runs.id, runId));
 

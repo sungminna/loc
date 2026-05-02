@@ -8,7 +8,8 @@
 //     [--audio-url <publicUrl>] \
 //     [--audio-attribution "..."] \
 //     [--out-dir data/runs/<runId>] \
-//     [--duration-sec 18]
+//     [--duration-sec 18] \
+//     [--accent "#facc15"]              # template.accentColor — tints kicker / progress / brand
 
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -26,6 +27,7 @@ interface Args {
   audioAttribution?: string;
   outDir: string;
   durationSec: number;
+  accent?: string;
 }
 
 function parseArgs(argv: string[]): Args {
@@ -34,6 +36,7 @@ function parseArgs(argv: string[]): Args {
     if (argv[i]?.startsWith("--")) m.set(argv[i]!.slice(2), argv[++i] ?? "");
   }
   const runId = m.get("run-id") ?? "";
+  const accentRaw = m.get("accent")?.trim();
   return {
     runId,
     composition: m.get("composition") ?? "CardNews",
@@ -42,6 +45,7 @@ function parseArgs(argv: string[]): Args {
     audioAttribution: m.get("audio-attribution"),
     outDir: m.get("out-dir") ?? `data/runs/${runId}`,
     durationSec: Number(m.get("duration-sec") ?? "18"),
+    accent: accentRaw && accentRaw.length > 0 ? accentRaw : undefined,
   };
 }
 
@@ -164,6 +168,7 @@ function buildCardProps(brief: CardBrief, args: Args) {
   return {
     brand: brief.brand,
     lang: brief.lang,
+    accent: args.accent,
     slides: slides.map((s) => ({
       kicker: s.kicker,
       headline: s.headline,
@@ -183,7 +188,7 @@ function buildVideoProps(brief: CardBrief, args: Args) {
   return {
     brand: brief.brand,
     lang: brief.lang,
-    accent: brief.video?.accent,
+    accent: args.accent ?? brief.video?.accent,
     scenes: scenes.map((s) => ({
       kicker: s.kicker,
       chapter: s.chapter,

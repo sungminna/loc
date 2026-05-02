@@ -136,7 +136,7 @@ export const topics = sqliteTable("topics", {
   // ai-all: every slide uses gpt-image-2. ai-first-only: slide 0 only,
   // others fall back to template.defaultBgR2Key (or gradient). template-only:
   // never call gpt-image-2; all slides use the template's static bg.
-  imageMode: text("image_mode", { enum: IMAGE_MODES }).notNull().default("ai-all"),
+  imageMode: text("image_mode", { enum: IMAGE_MODES }).notNull().default("ai-first-only"),
   // Threads can be plain-text or text-with-image. Independent of the IG
   // template choice — a topic with both targets renders Reels for IG and a
   // Threads post in this shape.

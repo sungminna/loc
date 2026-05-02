@@ -89,7 +89,7 @@ const topicInputSchema = z.object({
   costCapUsd: z.number().int().min(1).max(100).default(5),
   enabled: z.boolean().default(true),
   imageStylePrompt: z.string().max(1000).default(""),
-  imageMode: z.enum(IMAGE_MODES).default("ai-all"),
+  imageMode: z.enum(IMAGE_MODES).default("ai-first-only"),
   threadsFormat: z.enum(THREADS_FORMATS).default("image"),
   hashtagMode: z.enum(HASHTAG_MODES).default("ai"),
   fixedHashtags: z.array(z.string().min(1).max(60)).max(30).default([]),

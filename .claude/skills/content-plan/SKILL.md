@@ -117,6 +117,16 @@ What slide 5 must NOT be:
 - Avoid: stock-photo greys, generic office desk shots, AI clichés (perfect rooms, glowing orbs, robotic hands), clichéd "AI on phone screen" mockups.
 - The `imageStylePrompt` on the topic + `bgPromptTemplate` on the template are concatenated automatically. Your `bgImagePrompt` is the *content* layer.
 
+### slides[0].bgImagePrompt — the cover frame (treat it specially)
+
+In `ai-first-only` mode (the default for new topics) **only slide 0's `bgImagePrompt` is rendered through gpt-image-2** — slides 1..N use the template's gradient. So slide 0 carries the entire visual identity of the run. Don't write it like any other slide bg; write it like a magazine cover:
+
+- **Name the subject concretely.** Not "tech vibes" — a *thing* the viewer can read in 0.5 seconds. ("A single ceramic teacup mid-fall, frozen at 1/8000s, ceramic shards in motion." / "An exhausted office desk at 2am, monitor glow on a half-eaten ramen cup, no people in frame.")
+- **Compose for the typography overlay.** The template will paint kicker text in the upper third, the headline across the middle. Push your subject to one side or the lower-third and call out the empty zone explicitly: "subject offset to lower-right two-thirds, upper-left half intentionally negative space."
+- **Pick a single dominant tonality and one accent color.** The orchestrator will append the template's `accentColor` directive after your prompt — don't fight it. Specify the tonality (e.g. "warm muted earth tones", "high-contrast monochrome with one neon hit", "desaturated overcast palette") and let the accent layer cleanly on top.
+- **Keep it specific to *this run's* angle.** A finance run on inflation should not have a generic stock-chart bg. Pull a concrete moment from research.md — a real product, a real city, a real moment.
+- **Slides 1..N**: still emit `bgImagePrompt` for each (the dashboard / `ai-all` mode reuses them and a future re-roll might pull them), but they will not be rendered in the default flow. Don't waste your best ideas on slide 3 — load them into slide 0.
+
 ## Threads composition
 
 Threads is conversational. The format that wins in 2026 is **Hook → Context → Position → Invitation**:

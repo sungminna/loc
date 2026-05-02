@@ -122,7 +122,7 @@ const TOPICS: TopicSeed[] = [
     imageStylePrompt: "Editorial tech photography, deep navy / cyan palette, soft volumetric lighting, futuristic but minimal, no human faces close-up, no AI-art tropes (no glowing brains, no robot hands), high-end product shot feel.",
     hashtagMode: "mixed",
     fixedHashtags: ["AI", "인공지능", "테크", "AI트렌드", "AI뉴스"],
-    imageMode: "ai-all",
+    imageMode: "ai-first-only",
     threadsFormat: "image",
   },
 
@@ -171,7 +171,7 @@ const TOPICS: TopicSeed[] = [
     imageStylePrompt: "Editorial finance photography, Yeouido / Wall Street twilight, deep navy + emerald accent, candlestick chart textures at low opacity, no human faces, sober Bloomberg-magazine aesthetic.",
     hashtagMode: "mixed",
     fixedHashtags: ["투자", "주식", "코스피", "미국주식", "재테크", "경제"],
-    imageMode: "ai-all",
+    imageMode: "ai-first-only",
     threadsFormat: "image",
   },
 
@@ -216,7 +216,7 @@ const TOPICS: TopicSeed[] = [
     imageStylePrompt: "Cinematic global tech photography, NYC / Silicon Valley twilight skyline, navy + amber neon accent, minimal subject, editorial magazine feel — not stock-photo cliché.",
     hashtagMode: "mixed",
     fixedHashtags: ["빅테크", "미국주식", "엔비디아", "테슬라", "애플", "투자정보"],
-    imageMode: "ai-all",
+    imageMode: "ai-first-only",
     threadsFormat: "image",
   },
 
@@ -265,7 +265,7 @@ const TOPICS: TopicSeed[] = [
     imageStylePrompt: "Editorial dev-workspace photography, dark IDE-like color palette (deep blue / cyan), soft daylight on a clean desk, no human, minimal — laptop / terminal / mechanical keyboard close-up, shallow depth of field.",
     hashtagMode: "mixed",
     fixedHashtags: ["AI코딩", "개발자", "Cursor", "ClaudeCode", "프로그래밍"],
-    imageMode: "ai-all",
+    imageMode: "ai-first-only",
     threadsFormat: "image",
   },
 
@@ -309,7 +309,7 @@ const TOPICS: TopicSeed[] = [
     imageStylePrompt: "Editorial real-estate photography, soft warm daylight, Seoul / 한강 / 강남 skyline at dawn or dusk, no human in frame, calm magazine aesthetic, neutral steel palette with amber accent.",
     hashtagMode: "mixed",
     fixedHashtags: ["부동산", "경제", "재테크", "금리", "주간경제"],
-    imageMode: "ai-all",
+    imageMode: "ai-first-only",
     threadsFormat: "image",
   },
 
@@ -358,7 +358,7 @@ const TOPICS: TopicSeed[] = [
     imageStylePrompt: "Modern Korean Instagram card-news photography, soft pastel pop-art palette, single editorial subject (object representing the trend), clean studio lighting, no human face close-up, leaves room for a 9:16 frosted glass card overlay.",
     hashtagMode: "mixed",
     fixedHashtags: ["트렌드", "MZ", "주간이슈", "한국트렌드", "인스타카드뉴스"],
-    imageMode: "ai-all",
+    imageMode: "ai-first-only",
     threadsFormat: "image",
   },
 ];

@@ -36,6 +36,13 @@ exit 1
 
 The Worker reconciles unset states as a safety net but the dashboard UX depends on per-stage updates from here.
 
+> **Read this carefully — most failed runs in this codebase died here.** You are running headlessly with no human supervisor. After a sub-skill finishes (topic-research, content-plan, image-gen, etc.) it is *very tempting* to write a "Step N is done — would you like me to continue?" preamble or to simply stop because the Skill tool returned a result. **DO NOT.** A run that ends with `runs.status` left at any in-flight value (`researching`, `planning`, `generating`, `rendering`, `publishing`) is reconciled by the Worker to `failed` even if your Claude session exited cleanly with no error — those rows show up in the dashboard as `orchestrator exited cleanly but left status=<X> — skill did not call set-status done`. The ONLY two acceptable terminal states for this conversation are:
+>
+> 1. `set-status … done` (success path — every step ran), or
+> 2. `set-status … failed --error "<msg>" && exit 1` (explicit failure with reason).
+>
+> If a sub-skill returns an error, partial output, or even nothing useful, you still keep going through the remaining steps — research can fail and content-plan still runs off the persona; image-gen can fail and render-reel still produces a gradient reel; one publish target can fail and the other still ships. There is no scenario in which "step finished, stop" is correct. Treat the orchestration as one continuous shell pipeline that you drive to completion.
+
 ## Steps
 
 ### 0. Set up workspace
@@ -89,11 +96,27 @@ Persist the brief: `bun src/sandbox/db-cli.ts set-brief "$LOC_RUN_ID" data/runs/
 bun src/sandbox/db-cli.ts set-status "$LOC_RUN_ID" generating
 ```
 
-Compose prompt prefix from `topic.imageStylePrompt` + (if available) the IG template's `bgPromptTemplate`. Concatenate as `<style>. <bgPromptTemplate>. <slide.bgImagePrompt>` skipping empty parts.
+In `ai-first-only` mode (the default) **slide 0 is the only AI-generated frame in the entire reel** — it has to do all the visual heavy lifting because slides 1..N render on the template's solid gradient. Treat it as a magazine cover: one striking subject, generous negative space for typography, and a color story that matches the template's accent so the cover and the rest of the deck feel like one piece.
+
+#### Prompt composition (the order matters)
+
+gpt-image-2 weights the early part of the prompt heaviest. Compose the slide-0 prompt in this exact order so the slide's actual content drives the image instead of getting buried under style boilerplate:
+
+```
+<slide.bgImagePrompt> — vertical 2:3 cover frame, single dominant subject, generous negative space in upper third for kicker text and middle for headline, no on-screen text, no logos, no watermark.
+Style: <topic.imageStylePrompt>. <template.bgPromptTemplate>.
+Color palette anchored on <template.accentColor> as the dominant accent, with secondary tones that harmonize cleanly with the template's gradient backdrop so this cover and the following template-rendered slides read as one coherent deck.
+```
+
+Rules:
+- **Always lead with the slide's content prompt** (`slide.bgImagePrompt`) — never with style. If `bgImagePrompt` is empty, skip image-gen for that slide entirely.
+- Skip the Style line if both `topic.imageStylePrompt` and `template.bgPromptTemplate` are empty. Skip the Color line if `template.accentColor` is empty.
+- Always append the typography-safe-zone directive ("vertical 2:3 cover frame… no on-screen text") even when the user-provided prompts already mention composition — gpt-image-2 ignores it half the time without an explicit reminder.
+- Bump `--quality high` when generating the single slide-0 cover (one good image is worth the extra ~$0.04). `--quality auto` is fine for `ai-all` mode.
 
 Slide backgrounds (only when the IG template is **not** `reel-video`):
-- `imageMode = "ai-all"`: for each `slides[i]` lacking `bgImageR2Key`, run **image-gen** (`--aspect 2:3 --kind image-bg --user-id "$LOC_USER_ID"`) and write the resulting `r2Key` into `slides[i].bgImageR2Key`.
-- `imageMode = "ai-first-only"`: only generate for `slides[0]` (if missing). For `slides[1..]`, set `bgImageR2Key = template.defaultBgR2Key` if non-empty; otherwise leave `bgImageR2Key` undefined.
+- `imageMode = "ai-all"`: for each `slides[i]` lacking `bgImageR2Key`, run **image-gen** (`--aspect 2:3 --kind image-bg --quality auto --user-id "$LOC_USER_ID"`) and write the resulting `r2Key` into `slides[i].bgImageR2Key`. NOTE: this mode is rarely the right call — the template prompt dominates and per-slide prompts often produce visually similar outputs. Prefer `ai-first-only`.
+- `imageMode = "ai-first-only"` (default and recommended): only generate for `slides[0]` (if missing). Use `--quality high` since it's the only image. For `slides[1..]`, leave `bgImageR2Key` **unset** unless `template.defaultBgR2Key` is non-empty. The compositions render their own gradient + accent for unset backgrounds, which intentionally matches slide 0 because of the color directive above.
 - `imageMode = "template-only"`: for every slide, set `bgImageR2Key = template.defaultBgR2Key` if non-empty; otherwise leave it undefined. Do not call image-gen.
 
 **Video-reel templates (`kind === "reel-video"`):**
@@ -153,7 +176,7 @@ The output JSON has `id`, `r2Key`, and `attributionText`. Build `audioUrl = $R2_
 bun src/sandbox/db-cli.ts set-status "$LOC_RUN_ID" rendering
 ```
 
-- **Reels**: invoke **render-reel** with the IG template's `compositionId` (default `CardNews`; `SeedanceReel` for `kind === "reel-video"`), the brief path, the audio URL, and the attribution. The render-reel script auto-detects `SeedanceReel` and feeds `brief.video.scenes[]` to the composition; cards templates feed `brief.reel.slides[]`.
+- **Reels**: invoke **render-reel** with the IG template's `compositionId` (default `CardNews`; `SeedanceReel` for `kind === "reel-video"`), the brief path, the audio URL, the attribution, and `--accent <template.accentColor>` so the kicker / progress bar / brand stamp tint match the template. The render-reel script auto-detects `SeedanceReel` and feeds `brief.video.scenes[]` to the composition; cards templates feed `brief.reel.slides[]`.
 - **Threads**:
   - `topic.threadsFormat === "image"` → invoke **render-threads-image**.
   - `topic.threadsFormat === "text"` → skip rendering. The post is text-only.

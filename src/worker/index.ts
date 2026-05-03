@@ -1,5 +1,5 @@
 import type { Env, RunMessage } from "@shared/env";
-import { dispatch, consume } from "./scheduler";
+import { dispatch, consume, consumeDlq } from "./scheduler";
 import { handleTrpc } from "./api/trpc";
 import { handleInternal } from "./api/internal";
 import { handleAudioUpload } from "./api/audio-upload";
@@ -15,6 +15,13 @@ export default {
   },
 
   async queue(batch, env, ctx) {
+    // Both `loc-runs` (primary) and `loc-runs-dlq` (dead-letter) point at
+    // this same handler — branch on batch.queue so DLQ messages don't try
+    // to acquire a TopicRunner lock or spawn a sandbox.
+    if (batch.queue === "loc-runs-dlq") {
+      await consumeDlq(batch as MessageBatch<RunMessage>, env);
+      return;
+    }
     await consume(batch as MessageBatch<RunMessage>, env, ctx);
   },
 

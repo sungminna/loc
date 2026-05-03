@@ -120,6 +120,45 @@ export async function consume(
   }
 }
 
+// Dead-letter consumer. A message lands here only after `loc-runs`
+// exhausted its retries (max_retries=2 plus the original delivery). The
+// run row may still be in `planned` (we never spawned) or in a mid-
+// pipeline status (we crashed before recording terminal status). Either
+// way we want the dashboard to see `failed` so the topic is unblocked
+// and the operator has something to look at.
+//
+// Idempotency: we only flip the row if it's not already terminal.
+// Re-deliveries of the same DLQ message (rare, but possible during
+// retries with max_retries=0 and platform replays) are safe.
+export async function consumeDlq(
+  batch: MessageBatch<RunMessage>,
+  env: Env,
+): Promise<void> {
+  const db = getDb(env.DB);
+  for (const msg of batch.messages) {
+    const { runId, topicId, userId } = msg.body;
+    try {
+      const cur = await db.query.runs.findFirst({ where: eq(runs.id, runId) });
+      if (cur && cur.status !== "done" && cur.status !== "failed") {
+        await db.update(runs).set({
+          status: "failed",
+          error: `dead-lettered: queue retries exhausted (was ${cur.status})`,
+          finishedAt: new Date(),
+        }).where(eq(runs.id, runId));
+      }
+      env.ANALYTICS.writeDataPoint({
+        blobs: [topicId, runId, userId, "", "dlq"],
+        doubles: [0, 0, 0, -1],
+        indexes: [userId],
+      });
+      console.error(`[dlq] run ${runId} dead-lettered (prior status=${cur?.status ?? "missing"})`);
+    } catch (e) {
+      console.error(`[dlq] failed to mark run ${runId}:`, e);
+    }
+    msg.ack();
+  }
+}
+
 async function reachedDailyCap(env: Env, topicId: string, cap: number): Promise<boolean> {
   const db = getDb(env.DB);
   const dayStart = startOfUtcDay();

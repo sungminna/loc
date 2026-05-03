@@ -40,6 +40,17 @@ max_concurrency = 3
 max_retries = 2
 dead_letter_queue = "loc-runs-dlq"
 
+# DLQ consumer — runs that exhausted retries land here. We mark them
+# failed in D1 (so the dashboard sees a terminal status instead of
+# "planned" forever), record an analytics datapoint, and ack. Without
+# this, dead-lettered messages sit silently and the originating run row
+# stays in mid-pipeline status indefinitely.
+[[queues.consumers]]
+queue = "loc-runs-dlq"
+max_batch_size = 10
+max_concurrency = 1
+max_retries = 0
+
 # ── Durable Objects ──────────────────────────────────────────────────
 [[durable_objects.bindings]]
 name = "TOPIC_RUNNER"

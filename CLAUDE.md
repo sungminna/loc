@@ -55,7 +55,7 @@ There is **no test runner configured** — no jest/vitest in `package.json`. Don
    - Sandbox key is `u-<userId>/run-<runId>` — never collapse this; cross-user reuse would leak state.
    - `git clone --depth 1 $GITHUB_REPO_URL /workspace` (cwd starts at `/workspace`, so it `cd /` and `rm -rf /workspace` first).
    - `bun install --frozen-lockfile`.
-   - `bun src/sandbox/orchestrator.ts` with `IS_SANDBOX=1` and a 30-min ceiling. The orchestrator owns the state machine and emits a final `{"type":"loc_usage", ...}` line on stdout.
+   - `bun src/sandbox/orchestrator.ts` with `IS_SANDBOX=1` and a 60-min worker-side ceiling (last-resort guard above the orchestrator's per-stage timeouts; card-news runs typically finish in 5-8 min, video-reel in 30-50 min). The orchestrator owns the state machine and emits a final `{"type":"loc_usage", ...}` line on stdout.
    - `parseOrchestratorStdout` reads that line to record cost / tokens / session_id on the run row.
 
 ### Orchestrator (`src/sandbox/orchestrator.ts`)

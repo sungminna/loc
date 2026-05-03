@@ -7,7 +7,7 @@ import type { CardSlideProps, ReelSlide } from "../types";
 import { palettes, theme } from "../theme";
 import { maskWipe } from "../animations";
 
-const SLIDE_FRAMES = 90;
+const SLIDE_FRAMES = 150;
 
 export const defaultMinimalGridProps: CardSlideProps = {
   brand: { handle: "@yourhandle", name: "Loc" },

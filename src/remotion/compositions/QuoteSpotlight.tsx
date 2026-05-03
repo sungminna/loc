@@ -9,7 +9,7 @@ import type { CardSlideProps, ReelSlide } from "../types";
 import { palettes, theme } from "../theme";
 import { kenBurns, splitTextProgress } from "../animations";
 
-const SLIDE_FRAMES = 108;
+const SLIDE_FRAMES = 168;
 
 export const defaultQuoteSpotlightProps: CardSlideProps = {
   brand: { handle: "@yourhandle", name: "Loc" },

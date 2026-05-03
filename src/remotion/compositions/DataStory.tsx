@@ -9,7 +9,7 @@ import type { CardSlideProps, ReelSlide } from "../types";
 import { palettes, theme } from "../theme";
 import { countUp } from "../animations";
 
-const SLIDE_FRAMES = 102;
+const SLIDE_FRAMES = 162;
 
 export const defaultDataStoryProps: CardSlideProps = {
   brand: { handle: "@yourhandle", name: "Loc" },

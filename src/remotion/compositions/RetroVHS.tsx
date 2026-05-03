@@ -8,7 +8,7 @@ import type { CardSlideProps, ReelSlide } from "../types";
 import { palettes, theme } from "../theme";
 import { chromaShadow, grainPulse, pseudoRandom } from "../animations";
 
-const SLIDE_FRAMES = 96;
+const SLIDE_FRAMES = 156;
 
 export const defaultRetroVHSProps: CardSlideProps = {
   brand: { handle: "@yourhandle", name: "Loc" },

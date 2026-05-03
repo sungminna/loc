@@ -10,7 +10,7 @@ import type { CardSlideProps, ReelSlide } from "../types";
 import { palettes, theme } from "../theme";
 import { kenBurns, maskWipe } from "../animations";
 
-const SLIDE_FRAMES = 102;
+const SLIDE_FRAMES = 156;
 
 export const defaultBoldEditorialProps: CardSlideProps = {
   brand: { handle: "@yourhandle", name: "Loc" },

@@ -9,7 +9,7 @@ import type { CardSlideProps, ReelSlide } from "../types";
 import { palettes, theme } from "../theme";
 import { chromaShadow, kenBurns, splitTextProgress } from "../animations";
 
-const SLIDE_FRAMES = 96;
+const SLIDE_FRAMES = 150;
 
 export const defaultKineticTypeProps: CardSlideProps = {
   brand: { handle: "@yourhandle", name: "Loc" },

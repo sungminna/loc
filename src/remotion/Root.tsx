@@ -19,18 +19,20 @@ const FPS = 30;
 type AnyComp = React.ComponentType<Record<string, unknown>>;
 
 // Card-news compositions all share the same per-slide duration → expose
-// a shared metadata calculator so a brief with N slides yields a 3N-second
-// reel. Below is the base scene length each new composition sequences at.
+// a shared metadata calculator so a brief with N slides yields a 5N-second
+// reel. Per-slide duration was bumped from ~3s to ~5s so denser body copy
+// (insider-grade facts, mechanism + named entity + number) actually has
+// time to be read at native font size.
 const SLIDE_FRAMES_BY_COMP: Record<string, number> = {
-  CardNews: 90,
-  KineticType: 96,
-  BoldEditorial: 102,
-  MinimalGrid: 90,
-  NeoBrutalism: 96,
-  GlassMorphism: 96,
-  RetroVHS: 96,
-  DataStory: 102,
-  QuoteSpotlight: 108,
+  CardNews: 150,
+  KineticType: 150,
+  BoldEditorial: 156,
+  MinimalGrid: 150,
+  NeoBrutalism: 156,
+  GlassMorphism: 156,
+  RetroVHS: 156,
+  DataStory: 162,
+  QuoteSpotlight: 168,
 };
 
 function cardMetadata(compositionId: string) {
@@ -61,7 +63,7 @@ function RemotionRoot() {
         defaultProps={defaultCardNewsProps as unknown as Record<string, unknown>}
         calculateMetadata={({ props }) => {
           const slides = (props as unknown as CardNewsProps).slides ?? [];
-          return { durationInFrames: Math.max(FPS * 6, FPS * Math.max(1, slides.length) * 3) };
+          return { durationInFrames: Math.max(FPS * 6, FPS * Math.max(1, slides.length) * 5) };
         }}
       />
 

@@ -9,7 +9,7 @@ import type { CardSlideProps, ReelSlide } from "../types";
 import { palettes, theme } from "../theme";
 import { kenBurns, parallaxTilt } from "../animations";
 
-const SLIDE_FRAMES = 96;
+const SLIDE_FRAMES = 156;
 
 export const defaultGlassMorphismProps: CardSlideProps = {
   brand: { handle: "@yourhandle", name: "Loc" },

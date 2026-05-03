@@ -10,7 +10,7 @@ import type { CardSlideProps, ReelSlide } from "../types";
 import { palettes, theme } from "../theme";
 import { countUp } from "../animations";
 
-const SLIDE_FRAMES = 96;
+const SLIDE_FRAMES = 156;
 
 export const defaultNeoBrutalismProps: CardSlideProps = {
   brand: { handle: "@yourhandle", name: "Loc" },

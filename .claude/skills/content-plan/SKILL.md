@@ -30,8 +30,8 @@ If `template.json` has `kind === "reel-video"` (or `compositionId === "SeedanceR
     "slides": [
       {
         "kicker": "<2-4 word category, ALL CAPS>",
-        "headline": "<≤14 chars Korean / ≤22 chars English. Punchy.>",
-        "body": "<≤40 chars supporting line. Optional.>",
+        "headline": "<≤30 chars Korean / ≤45 chars English. Punchy main statement.>",
+        "body": "<≤120 chars supporting copy — pack the insider-grade specifics here: the named entity, the mechanism, the dated number. Wraps to 2-4 lines at composition font size.>",
         "emphasis": "<single emoji used as stamp on a key slide. Optional.>",
         "stat": { "value": "73", "suffix": "%", "label": "label" },
         "bgImagePrompt": "<vivid prompt for gpt-image-2, vertical, no text in image>"
@@ -105,10 +105,12 @@ What slide 5 must NOT be:
 - Memorable line tied to the persona, OR an explicit "🔖 저장하고 다시 보기" with `emphasis: "🔖"`.
 - Skipping slide 6 is fine for ≤6s content.
 
-### Headlines (KO ≤14, EN ≤22 chars)
-- 한국어: 조사 줄이고 명사 위주. 동사는 받침 없는 짧은 형. "나는 매일 ___" 보다 "매일 ___".
-- English: drop articles. Use sentence-fragment style: "Three rules I broke", not "These are the three rules I broke".
-- Readable in ≤1 second of muted scroll.
+### Headlines (KO ≤30, EN ≤45 chars) and body (≤120 chars)
+- The headline is still the muted-scroll hook — first line you read. KO ≤30 chars, EN ≤45 chars. 한국어는 조사 줄이고 명사 위주. 동사는 받침 없는 짧은 형. Readable in ≤1.5 seconds muted.
+- The **body** carries the substance: 1-3 short sentences (≤120 chars total) that name the entity, the dated number, and the mechanism. This is where the insider-only fact lives. At slide-native font size it wraps to 2-4 lines and the slide duration is 5 seconds — enough to read at a normal pace, not enough to skim past.
+- Don't use the body as a tagline ("멋진 변화"). Use it as the payoff: "신용잔고 39.2조, 8주 연속 증가. 외국인 매도와 동시에 일어난 건 2020년 3월 이후 처음."
+- English example: "Anthropic Memory tool launched 2026-04-23 in beta. Stores Claude conversations across sessions; the side-effect is per-user usage doubled within a week of opt-in for paying customers."
+- If headline + body together still read like a generic news caption, rewrite. The bar is "nobody who already follows this space would have guessed the body line from the headline."
 
 ### Image prompts (sound-off design)
 - ~50% of Reels are watched muted — the visual must carry the meaning.
@@ -153,7 +155,7 @@ See `.claude/skills/image-gen/SKILL.md` for the full vocabulary cheatsheet and 4
 In `ai-first-only` mode (the default for new topics) **only slide 0's `bgImagePrompt` is rendered through gpt-image-2** — slides 1..N use the template's gradient. So slide 0 carries the entire visual identity of the run. Don't write it like any other slide bg; write it like a magazine cover:
 
 - **Name the subject concretely.** Not "tech vibes" — a *thing* the viewer can read in 0.5 seconds. ("A single ceramic teacup mid-fall, frozen at 1/8000s, ceramic shards in motion." / "An exhausted office desk at 2am, monitor glow on a half-eaten ramen cup, no people in frame.")
-- **Compose for the typography overlay.** The template will paint kicker text in the upper third, the headline across the middle. Push your subject to one side or the lower-third and call out the empty zone explicitly: "subject offset to lower-right two-thirds, upper-left half intentionally negative space."
+- **Compose for the typography overlay AND for the 9:16 crop.** The image generates at 2:3 but is displayed in a 9:16 reel that crops ~8% off each horizontal edge. Keep the subject inside the **central vertical band** (~50–90% horizontally), never against the far left or right edge. The template paints kicker text in the upper third and the headline across the middle, so leave the upper third clear too. Call out the empty zone explicitly: "subject in the central column, slightly lower-third, the upper third intentionally negative space, no critical content within 10% of the left or right edge."
 - **Pick a single dominant tonality and one accent color.** The orchestrator will append the template's `accentColor` directive after your prompt — don't fight it. Specify the tonality (e.g. "warm muted earth tones", "high-contrast monochrome with one neon hit", "desaturated overcast palette") and let the accent layer cleanly on top.
 - **Keep it specific to *this run's* angle.** A finance run on inflation should not have a generic stock-chart bg. Pull a concrete moment from research.md — a real product, a real city, a real moment.
 - **Slides 1..N**: still emit `bgImagePrompt` for each (the dashboard / `ai-all` mode reuses them and a future re-roll might pull them), but they will not be rendered in the default flow. Don't waste your best ideas on slide 3 — load them into slide 0.

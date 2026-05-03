@@ -14,7 +14,15 @@
 // Records `posts` row, polls container, calls media_publish.
 
 import { api } from "./lib/api";
-import { publicUrl } from "./upload";
+
+// IG's Reels video fetcher honors robots.txt, and Cloudflare's `*.r2.dev`
+// public URL serves a global noindex policy that blocks it. Route IG video
+// + cover through the Worker's `/media/` proxy (same bucket, our domain).
+function workerMediaUrl(key: string): string {
+  const base = (process.env.LOC_API_BASE ?? "").replace(/\/$/, "");
+  if (!base) throw new Error("LOC_API_BASE not set — cannot build IG media URL");
+  return `${base}/media/${key.split("/").map(encodeURIComponent).join("/")}`;
+}
 
 const GRAPH = "https://graph.instagram.com/v25.0";
 
@@ -91,8 +99,8 @@ async function publishReel(args: Args): Promise<void> {
   }
 
   const caption = composeCaption(args);
-  const videoUrl = publicUrl(args.videoR2Key);
-  const coverUrl = args.coverR2Key ? publicUrl(args.coverR2Key) : undefined;
+  const videoUrl = workerMediaUrl(args.videoR2Key);
+  const coverUrl = args.coverR2Key ? workerMediaUrl(args.coverR2Key) : undefined;
 
   const { post } = await api.recordPost({
     runId: args.runId,

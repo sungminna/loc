@@ -858,8 +858,15 @@ function composeSlidePrompt(
   // Use case — telling the model what the artifact is for materially
   // changes how it composes. "Cover frame for a Reel" produces editorial
   // composition; without it the model defaults to centered stock layouts.
+  //
+  // gpt-image-2 only supports 1:1 / 3:2 / 2:3 — we render at 2:3 and the
+  // Remotion 1080x1920 (9:16) reel cover-fits it, cropping ~7-8% off the
+  // left and right edges. So the *important* part of the composition must
+  // sit in the central vertical column. Tell the model that explicitly so
+  // a subject in the lower-right two-thirds doesn't get half its right
+  // edge sliced off after the 9:16 crop.
   parts.push(
-    "Use case: a vertical 2:3 cover frame for an Instagram Reel. The subject sits in the lower-right two-thirds; the upper third and the upper-left are intentionally empty for a kicker label and a headline overlay. Frame as a candid, unposed editorial photograph captured in the moment — not a studio composite.",
+    "Use case: a 2:3 vertical photograph that will be displayed as the cover frame of a 9:16 Instagram Reel — the final view crops ~8% off the left and right edges of your image. The subject MUST sit inside the central vertical band (roughly 50% to 90% horizontal); never push it to the far left or far right edge. The upper third and the lower 12% (Reels UI safe area) stay free of the subject so kicker, headline, and Reels UI sit cleanly. Frame as a candid, unposed editorial photograph captured in the moment — not a studio composite, not a centered stock layout.",
   );
 
   // Constraints — explicit negatives. Listed in priority order. The "no

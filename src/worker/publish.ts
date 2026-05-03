@@ -61,8 +61,13 @@ export async function publishRunToInstagram(
   });
 
   try {
-    const videoUrl = `${env.R2_PUBLIC_BASE}/${reel.r2Key}`;
-    const coverUrl = cover ? `${env.R2_PUBLIC_BASE}/${cover.r2Key}` : undefined;
+    // Route through the Worker `/media/` proxy — IG's Reels fetcher refuses
+    // `*.r2.dev` URLs because of Cloudflare's default robots policy.
+    const workerBase = env.PUBLIC_WORKER_URL.replace(/\/$/, "");
+    const mediaUrl = (key: string) =>
+      `${workerBase}/media/${key.split("/").map(encodeURIComponent).join("/")}`;
+    const videoUrl = mediaUrl(reel.r2Key);
+    const coverUrl = cover ? mediaUrl(cover.r2Key) : undefined;
 
     const params = new URLSearchParams({
       media_type: "REELS",

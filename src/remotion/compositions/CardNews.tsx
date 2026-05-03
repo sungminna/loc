@@ -32,7 +32,7 @@ export const defaultCardNewsProps: CardNewsProps = {
   ],
 };
 
-const SLIDE_FRAMES = 90; // 3초 @ 30fps
+const SLIDE_FRAMES = 150; // 5초 @ 30fps — denser body copy needs read time
 
 export const CardNews: React.FC<CardNewsProps> = ({ brand, lang, slides, audioUrl, attribution, accent }) => {
   const { fps, durationInFrames, width, height } = useVideoConfig();

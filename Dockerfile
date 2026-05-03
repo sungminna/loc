@@ -36,8 +36,9 @@ RUN mkdir -p /tmp/remotion-prefetch \
   && npm init -y >/dev/null \
   && npm install --no-save @remotion/renderer@4 \
   && node -e "require('@remotion/renderer').ensureBrowser().then(() => console.log('remotion chromium prefetched')).catch(e => { console.error('ensureBrowser failed:', e); process.exit(1); })" \
-  && cd / && rm -rf /tmp/remotion-prefetch \
-  && test -d /root/.cache/remotion
+  && echo "[chromium cache layout]" \
+  && find /root -type d -name "*remotion*" -o -name "*chrome*" -o -name "*chromium*" -o -name "*puppeteer*" 2>/dev/null | head -20 \
+  && cd / && rm -rf /tmp/remotion-prefetch
 
 # The base image already declares the workdir, server CMD, and EXPOSE 3000.
 # Do NOT override CMD — the sandbox server must remain the entrypoint.

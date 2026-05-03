@@ -55,8 +55,24 @@ There is **no test runner configured** — no jest/vitest in `package.json`. Don
    - Sandbox key is `u-<userId>/run-<runId>` — never collapse this; cross-user reuse would leak state.
    - `git clone --depth 1 $GITHUB_REPO_URL /workspace` (cwd starts at `/workspace`, so it `cd /` and `rm -rf /workspace` first).
    - `bun install --frozen-lockfile`.
-   - `claude -p "<orchestrate-run prompt>" --output-format stream-json --dangerously-skip-permissions` with `IS_SANDBOX=1` (bypasses CLI's "no skip-permissions as root" guard).
-   - Parses the `result/success` line from the stream-json stdout to extract `total_cost_usd`, token counts, `session_id`.
+   - `bun src/sandbox/orchestrator.ts` with `IS_SANDBOX=1` and a 30-min ceiling. The orchestrator owns the state machine and emits a final `{"type":"loc_usage", ...}` line on stdout.
+   - `parseOrchestratorStdout` reads that line to record cost / tokens / session_id on the run row.
+
+### Orchestrator (`src/sandbox/orchestrator.ts`)
+
+The orchestrator is a deterministic TS process — **not** a Claude markdown skill. This was a pointed switch: the previous `claude -p "<orchestrate-run skill>"` design relied on the model to drive all 8 stages from a single conversation, and the headless model frequently stopped after `topic-research` (leaving `runs.status='researching'`, which the worker reconciler marked as `failed: orchestrator exited cleanly but left status=researching`). The TS process can't decide to stop — every stage transition is a function call.
+
+Stages, in order: `setup → researching → planning → (storyboard) → generating → (video) → audio → rendering → publishing → done`. Each stage:
+1. Flips `runs.status` via the internal API.
+2. Does its work. LLM stages spawn a focused `claude -p` subprocess (narrow goal: write `research.md`, write `brief.json`, append `video.scenes[]`). Deterministic stages spawn the existing `bun src/sandbox/<x>.ts` CLIs.
+3. Catches errors with stage-specific severity:
+   - `research`, `image`, `audio`: best-effort; log + continue.
+   - `plan`, `render`, `storyboard`, `video`: required; mark failed + exit 1.
+   - `publish`: per-platform — fail only if all configured platforms fail.
+
+Each `claude -p` invocation has ONE narrow goal and a per-stage timeout (research 8m, plan 8m, storyboard 6m). Even when the model stops early, the orchestrator advances; missing artifacts are detected at the stage's catch site (e.g., `brief.json` retried once with the parse error fed back).
+
+Cost accumulation: each `claude -p` call's stream-json `result` line is parsed and added to a process-level total. Final `{"type":"loc_usage", "cost_usd", "tokens_in", "tokens_out", "session_id"}` line on stdout is what the worker spawner reads.
 
 ### The internal API contract (sandbox ↔ worker)
 
@@ -78,11 +94,13 @@ Slugs are unique across the user's templates AND the shared pool (see `ensureSlu
 
 ### Skills (`.claude/skills/`)
 
-Each skill is a directory with a `SKILL.md` (YAML frontmatter + markdown body). The orchestrator (`orchestrate-run`) calls each in order; per-user prompt overrides come from D1 `skill_prompts` and are appended at runtime. `.claude/settings.json` sets `defaultMode: "bypassPermissions"` for full autonomy in-sandbox; only catastrophic commands (`rm -rf /`, `mkfs`, `shutdown`) are denied.
+Each skill is a directory with a `SKILL.md` (YAML frontmatter + markdown body). The orchestrator no longer "invokes a skill" — it spawns `claude -p` subprocesses with focused inline prompts, and references the SKILL.md files as documentation that the model reads when needed (the prompts say "follow the rules in `.claude/skills/content-plan/SKILL.md`"). The skills under `.claude/skills/` are: `topic-research`, `content-plan`, `video-storyboard`, `image-gen`, `video-gen`, `select-audio`, `render-reel`, `render-threads-image`, `ig-publish-reel`, `threads-publish`. Per-user prompt overrides in `skill_prompts` are not currently applied by the new orchestrator (TODO if needed).
 
-Two important branches in `orchestrate-run`:
-- **Topic draft replay**: if `topics.useDraftForNext` is true, the dashboard-edited `draftBrief` is used verbatim and steps 2–3 (research + content-plan) are skipped. The `consume-topic-draft` call resets the flag.
-- **Video reel templates** (`templates.kind === "reel-video"`, composition `SeedanceReel`): runs `video-storyboard` to populate `brief.video.scenes[]`, then per-scene `video-gen` (Replicate `bytedance/seedance-2.0`). Slide-bg loop is skipped entirely. Card templates (`reel-cards`) skip video-gen and feed `brief.reel.slides[]`.
+`.claude/settings.json` sets `defaultMode: "bypassPermissions"` for full autonomy in-sandbox; only catastrophic commands (`rm -rf /`, `mkfs`, `shutdown`) are denied.
+
+Two important branches in the orchestrator:
+- **Topic draft replay**: if `topics.useDraftForNext` is true, the dashboard-edited `draftBrief` is used verbatim and the research + content-plan stages are skipped. `consume-topic-draft` resets the flag.
+- **Video reel templates** (`templates.kind === "reel-video"`, composition `SeedanceReel`): the orchestrator runs `stage_storyboard` to populate `brief.video.scenes[]`, then per-scene `video-gen` (Replicate `bytedance/seedance-2.0`). Slide-bg loop is skipped entirely. Card templates (`reel-cards`) skip video-gen and feed `brief.reel.slides[]`.
 
 ### Remotion compositions
 

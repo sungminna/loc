@@ -5,7 +5,10 @@ import { runs, topics, accounts, type RunStatus } from "@db/schema";
 import type { Env } from "@shared/env";
 import { decryptToken } from "./crypto";
 
-const CLAUDE_TIMEOUT_MS = 15 * 60 * 1000;
+// 30 min: enough for the full pipeline including a video-reel run
+// (storyboard + 4×Seedance + render). Card-news runs typically finish in 5-8
+// min; this is the worst-case ceiling, not the expected duration.
+const CLAUDE_TIMEOUT_MS = 30 * 60 * 1000;
 
 export async function spawnSandboxRun(
   env: Env,
@@ -72,74 +75,29 @@ export async function spawnSandboxRun(
       ...tokenEnv,
     };
 
-    // Headless Claude CLI behaviour notes:
-    //  - Slash commands (`/orchestrate-run …`) are NOT expanded in -p mode,
-    //    so we cannot rely on the skill's slash-command form.
-    //  - A terse prompt like "Run the orchestrate-run skill" is interpreted
-    //    conversationally — the model summarises what it WOULD do without
-    //    actually invoking any tool (run finishes in <1 min, 29 input
-    //    tokens, no brief, no assets). To force an actual tool invocation
-    //    we lead with "Use the Skill tool to invoke …" — that maps 1:1 to
-    //    a Skill tool call with `skill: "orchestrate-run"`.
-    //  - The skill's frontmatter (`allowed-tools: Bash, Read, Write,
-    //    WebFetch, WebSearch, Skill`) lets it call sub-skills (image-gen
-    //    etc.) once invoked.
-    const prompt = [
-      `You are running headlessly inside a Cloudflare sandbox container with FULL AUTONOMY. There is no human to ask. Do NOT reply with prose. Do NOT pause for clarification or confirmation. Make every decision independently — when in doubt, pick a defensible default and move forward; when something fails, log a short stderr message and continue with the next viable path. Permissions are pre-granted; every tool you can see is yours to use.`,
-      ``,
-      `Use the Skill tool to invoke the "orchestrate-run" skill now. Pass these arguments verbatim:`,
-      ``,
-      `  runId=${runId}`,
-      `  topicId=${topicId}`,
-      `  userId=${userId}`,
-      ``,
-      `These values are also already exported as LOC_RUN_ID / LOC_TOPIC_ID / LOC_USER_ID in the shell, so any Bash step inside the skill can use the env vars directly.`,
-      ``,
-      `The skill drives one full autonomous content cycle (research → content-plan → image-gen → video-gen if applicable → select-audio → render-reel → ig/threads publish). It is responsible for:`,
-      `  1. Calling \`bun src/sandbox/db-cli.ts set-status "$LOC_RUN_ID" <stage>\` BEFORE every stage transition so the dashboard reflects progress.`,
-      `  2. On any uncaught failure, calling \`set-status … failed --error "<short msg>"\` and exiting non-zero.`,
-      `  3. Ending with \`set-status … done\` on success.`,
-      ``,
-      `Use any built-in tool you need (Bash, Read, Write, Edit, Glob, Grep, WebFetch, WebSearch, Skill, Task, TodoWrite, etc.) without hesitation. If a sub-step would normally prompt for permission, treat it as already approved and proceed.`,
-      ``,
-      `If the run finishes without ever calling \`set-status done\`, the parent process will mark it failed. Begin by invoking the Skill tool — no preamble.`,
-    ].join("\n");
-
-    // Write the prompt to a file inside the sandbox and pipe it via cat
-    // rather than embedding in the shell command. JSON.stringify-into-shell
-    // turns \n into the literal backslash-n sequence (because bash double
-    // quotes don't interpret escape codes), which makes the prompt ugly
-    // and harder for the model to parse. Using a file preserves real
-    // newlines and sidesteps shell escape ambiguity entirely.
-    const PROMPT_PATH = "/workspace/.loc-prompt.txt";
-    await sandbox.writeFile(PROMPT_PATH, prompt);
-
-    // Permission flags only — no --allowed-tools whitelist on purpose.
-    // Under --permission-mode bypassPermissions the whitelist would be
-    // overridden anyway, but more importantly we WANT the model to have
-    // every built-in tool (Task, NotebookEdit, TodoWrite, etc.) available
-    // for full autonomy. Catastrophic Bash patterns (rm -rf /, mkfs,
-    // shutdown) are still blocked by .claude/settings.json `permissions.deny`
-    // — that hard block survives bypassPermissions.
+    // The orchestrator is now a deterministic TS process owned by us
+    // (src/sandbox/orchestrator.ts). It drives all 8 stages explicitly and
+    // sets D1 status from code, not from the model. LLM-required stages
+    // (research, plan, storyboard) are still served by `claude -p`, but
+    // each call is narrow + bounded — even if the model stops early the
+    // orchestrator advances the next stage. This eliminates the previous
+    // "orchestrator exited cleanly but left status=researching" failure
+    // mode where a single broad `claude -p` invocation owned the entire
+    // pipeline and could decide to stop after the first sub-skill.
     //
-    // --permission-mode + --dangerously-skip-permissions are NOT redundant:
-    // the former sets the mode, the latter is the explicit "I mean it"
-    // circuit breaker. Both are appropriate for an ephemeral sandbox
-    // running as root with IS_SANDBOX=1.
+    // The orchestrator emits a final stdout line of the form
+    // `{"type":"loc_usage","cost_usd":...,"tokens_in":...}` aggregating
+    // every claude -p subprocess it spawned. We parse that below.
     const result = await sandbox.exec(
-      `cd /workspace && cat ${PROMPT_PATH} | claude -p ` +
-        `--output-format stream-json ` +
-        `--verbose ` +
-        `--permission-mode bypassPermissions ` +
-        `--dangerously-skip-permissions`,
+      `cd /workspace && bun src/sandbox/orchestrator.ts`,
       { env: childEnv, timeout: CLAUDE_TIMEOUT_MS },
     );
 
-    const totals = parseClaudeStream(result.stdout);
+    const totals = parseOrchestratorStdout(result.stdout);
     const failed = result.exitCode !== 0;
     const errorMessage = failed
       ? extractError(result.stderr, result.stdout) ||
-        `claude exited with code ${result.exitCode}`
+        `orchestrator exited with code ${result.exitCode}`
       : null;
 
     // The orchestrator skill is responsible for setting status=done|failed,
@@ -264,28 +222,26 @@ interface ClaudeTotals {
   lastError?: string;
 }
 
-function parseClaudeStream(stream: string): ClaudeTotals {
+function parseOrchestratorStdout(stdout: string): ClaudeTotals {
+  // The orchestrator (src/sandbox/orchestrator.ts) prints exactly one
+  // `{"type":"loc_usage", ...}` line at the end aggregating every claude -p
+  // subprocess it spawned. Walk backwards so we land on the final usage
+  // line even if earlier stdout contained noise.
   const totals: ClaudeTotals = { tokensIn: 0, tokensOut: 0 };
-  for (const line of stream.split("\n")) {
-    if (!line.trim()) continue;
+  const lines = stdout.split("\n");
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i]?.trim();
+    if (!line || !line.startsWith("{")) continue;
     try {
       const obj = JSON.parse(line) as Record<string, unknown>;
-      if (obj.type === "result") {
-        // Capture both success and error final results so we can read totals
-        // even on a failed run.
-        totals.sessionId = (obj.session_id as string | undefined) ?? totals.sessionId;
-        if (typeof obj.total_cost_usd === "number") totals.costUsd = obj.total_cost_usd;
-        const usage = obj.usage as { input_tokens?: number; output_tokens?: number } | undefined;
-        if (usage) {
-          totals.tokensIn = usage.input_tokens ?? totals.tokensIn;
-          totals.tokensOut = usage.output_tokens ?? totals.tokensOut;
-        }
-        if (obj.subtype !== "success" && typeof obj.error === "string") {
-          totals.lastError = obj.error;
-        }
-      }
+      if (obj.type !== "loc_usage") continue;
+      if (typeof obj.cost_usd === "number") totals.costUsd = obj.cost_usd;
+      if (typeof obj.tokens_in === "number") totals.tokensIn = obj.tokens_in;
+      if (typeof obj.tokens_out === "number") totals.tokensOut = obj.tokens_out;
+      if (typeof obj.session_id === "string") totals.sessionId = obj.session_id;
+      return totals;
     } catch {
-      // Ignore non-JSON noise interleaved with the JSON lines.
+      // keep walking back
     }
   }
   return totals;

@@ -17,12 +17,18 @@ The downstream `content-plan` skill is judged on whether slide 1 stops the scrol
 2. For each sourceUrl (max 6):
    - `WebFetch` with this prompt template:
 
-     > "Pull from this article the strongest material for a 30-second Instagram Reel about <topic.name>:
-     > 1. Up to 3 specific numbers, dates, or named entities (e.g. '38%', '2025년 4월', 'Anthropic').
-     > 2. One contrarian or counter-intuitive claim — something that challenges what most people assume.
-     > 3. One concrete first-person example (a person, company, or moment).
-     > 4. The single most quotable sentence from the article.
-     > Return as bullet points. Skip filler. If the article is a generic listicle, say so plainly."
+     > "Pull from this article the strongest material for a 30-second Instagram Reel about <topic.name>.
+     >
+     > **Hard filter — reject anything any casual reader of the news would already know.** If a bullet could appear verbatim in a generic newsletter ('AI is changing work', '금리가 오르면 주가가 내린다', '사람들이 SNS를 많이 본다'), drop it. Default to *insider-only* angles: numbers a domain expert would not know off the top of their head, mechanisms only practitioners discuss, or details buried below the article's lede.
+     >
+     > Return:
+     > 1. Up to 3 specific numbers, dates, or named entities that a senior in this field would still pause on (e.g. '신용잔고 38조 돌파', '2026년 4월 23일 발표', 'Anthropic Memory Tool 베타'). Skip vanity stats everyone has seen.
+     > 2. One contrarian or counter-intuitive claim — something that contradicts the obvious assumption *and* is supported by a mechanism the article spells out. Cite the mechanism in one sub-bullet.
+     > 3. One concrete first-person example (named person, named company, dated moment) that is not the headline anecdote — pull from a side paragraph.
+     > 4. The single most quotable sentence from the article — a sentence that reads as a take, not as a summary.
+     > 5. **Anti-bullets**: list 1-2 things from the article that are *too well-known* to use, so the next stage knows what to avoid restating.
+     >
+     > Return as bullet points. Skip filler. If the article is a generic listicle or surface-level recap with no insider angle, say so plainly and return nothing."
 
    - Save title + summary via the wrapper:
      ```
@@ -47,26 +53,29 @@ The downstream `content-plan` skill is judged on whether slide 1 stops the scrol
    # Research digest — <topic.name>
    _Run <runId> · <today>_
 
-   ## Scroll-stoppers (use these in slide 1 hooks)
-   - Specific number or fact #1 (with source)
-   - Specific number or fact #2 (with source)
-   - Specific number or fact #3 (with source)
+   ## Scroll-stoppers (insider-grade only — generic news headlines do NOT belong here)
+   - Specific number / named-entity / mechanism #1 — would a domain expert raise an eyebrow? (with source)
+   - Specific number / named-entity / mechanism #2 — same bar (with source)
+   - Specific number / named-entity / mechanism #3 — same bar (with source)
 
    ## Counter-intuitive angles
-   - Claim that contradicts the obvious assumption (with the source's reasoning).
+   - Claim that contradicts the obvious assumption + the mechanism that explains it (with source).
    - …
 
    ## Concrete moments / examples
-   - Person or company name, what they did, what happened.
+   - Named person / company / date — what they did, what happened (not the headline anecdote — a sidebar one).
    - …
 
    ## Notable terms to weave in
-   - Terms / brand names / acronyms that signal the writer is in-the-loop.
+   - Terms / brand names / acronyms / version numbers that signal the writer is in-the-loop.
 
-   ## Avoid
-   - Generic phrasing this topic is drowning in (e.g. "AI is changing everything").
+   ## Avoid (do NOT restate in slides)
+   - Generic phrasing this topic is drowning in (e.g. "AI is changing everything", "투자엔 리스크가 따른다").
+   - Things every casual reader already knows — list 3-5 specific examples pulled from the sources.
    - Recycled bad takes that have already saturated Threads.
    ```
+
+   **Failure mode to avoid:** a digest where every Scroll-stopper bullet is a thing your friend who doesn't follow this space could still reasonably know. If you find that pattern, redo step 2 with an explicit "go deeper than the headline" instruction before writing the digest.
 
 5. Stdout: print the digest path.
 

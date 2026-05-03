@@ -78,8 +78,9 @@ What slide 1 must NOT be:
 
 ### Slide 2-4 = payoff (one idea each)
 - Each slide adds **exactly one** concrete, take-away-able idea.
+- **Insider-only bar**: every slide must surface something a casual reader of mainstream news would NOT already know — a specific number from a sidebar in research.md, a mechanism most people skip past, a named entity (company / person / version / dated event), a contrarian claim with a stated reason. If the slide could appear word-for-word in a generic newsletter — or if a friend who doesn't follow this space could guess the body line from the headline — it's wrong; rewrite with a more specific, less obvious detail.
 - If the headline doesn't fit on one line at native font size, it's too long.
-- Use stat slides where the data is genuinely surprising. Don't invent numbers; cite them from research.md only when they are real.
+- Use stat slides where the data is genuinely surprising. Don't invent numbers; cite them from research.md only when they are real. If research.md's "Avoid" / "Anti-bullets" section flags a fact as "too well-known", do not put that fact on a slide.
 - Don't repeat slide 1's hook in slide 2 — the viewer already paid attention; reward them with new info.
 
 ### Slide 5 = action + conversion
@@ -343,8 +344,9 @@ After your first draft, check yourself in this order. Revise once before writing
 6. **Anti-AI-tells sweep.** Scan every line of `caption.instagram`, `caption.threads`, `threads.text`, and every `headline` / `body` for the banned openers, scaffolding, closers, and triadic-balance phrases listed under "Write like a human". If you find one, rewrite. Adjectives like "stunning / incredible / amazing / 정말 놀라운" are auto-fail.
 7. **Image-prompt sweep.** For every `bgImagePrompt`: does it follow Scene → Subject → Details? Does it name a lens AND a light source AND one material/imperfection? Are there any banned words from the anti-slop list? If a prompt reads like "stunning minimalist tech aesthetic with neon glow", rewrite it as a concrete moment.
 8. **Round-number sweep.** If you wrote `약 50%`, `한 달 정도`, `수십만 명`, replace with the measured number from research.md or drop the claim.
+9. **Common-knowledge sweep.** Imagine showing the slide deck to (a) a domain expert and (b) a friend who only reads news headlines. For every slide 2-4, would the expert say "yeah, obviously" *and* the friend say "I already knew that"? If both, the slide is generic — rewrite with a specific number / named entity / mechanism pulled from research.md's Scroll-stoppers section. If `research.md` has an "Avoid" / "Anti-bullets" list, none of those facts may appear on a slide. A run that just paraphrases the news headline has zero value; redo until at least 2 of 3 middle slides surface insider-grade specifics.
 
-If a revision still fails any check, do another pass. Do not write the brief until all eight pass.
+If a revision still fails any check, do another pass. Do not write the brief until all nine pass.
 
 ## Image-prompt rules (interplay with imageMode)
 

@@ -78,6 +78,12 @@ export async function spawnSandboxRun(
       REPLICATE_API_TOKEN: env.REPLICATE_API_TOKEN,
       AI_GATEWAY_BASE: env.AI_GATEWAY_BASE,
       R2_PUBLIC_BASE: env.R2_PUBLIC_BASE,
+      // Tell Remotion (via puppeteer-browsers) where to find the Chromium
+      // binary that was prefetched into the Docker image. Without this,
+      // Remotion's first renderMedia / selectComposition call would try to
+      // re-download Chromium from inside the per-run sandbox network — the
+      // exact failure that produced "at processTicksAndRejections" runs.
+      PUPPETEER_CACHE_DIR: "/opt/puppeteer-cache",
       ...tokenEnv,
     };
 

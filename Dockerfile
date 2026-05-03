@@ -22,23 +22,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && ln -sf /root/.bun/bin/bun /usr/local/bin/bun \
   && npm install -g @anthropic-ai/claude-code
 
-# Pre-bake Remotion's bundled Chromium into /root/.cache/remotion/. Without
-# this, the first selectComposition/renderMedia call in each run triggers a
-# ~150 MB Chromium auto-download from inside the per-run sandbox container.
-# That download has been observed to fail silently in the sandbox network,
-# leaving render-reel.ts to throw with a stack like `at
-# processTicksAndRejections (native:7:39)` and no actionable message —
-# which is exactly the failure pattern we hit. By prefetching at image-
-# build time the cache lives in the image layer and is available from the
-# moment a fresh container boots, every run.
-RUN mkdir -p /tmp/remotion-prefetch \
-  && cd /tmp/remotion-prefetch \
+# Pre-bake Remotion's bundled Chromium into the image so per-run sandbox
+# containers don't have to download ~150 MB from inside the (sometimes
+# unreliable) sandbox network on every run. The previous attempt put the
+# install in /tmp and `rm`'d it after the download — which deleted the
+# Chromium cache too, since @remotion/renderer downloads via puppeteer-
+# browsers into PUPPETEER_CACHE_DIR (default: $HOME/.cache/puppeteer/).
+# Pin that env var to a stable path AND keep the install on disk; the
+# spawner sets the same PUPPETEER_CACHE_DIR at runtime so Remotion finds
+# the prefetched binary instantly.
+ENV PUPPETEER_CACHE_DIR=/opt/puppeteer-cache
+RUN mkdir -p /opt/remotion-runtime \
+  && cd /opt/remotion-runtime \
   && npm init -y >/dev/null \
   && npm install --no-save @remotion/renderer@4 \
   && node -e "require('@remotion/renderer').ensureBrowser().then(() => console.log('remotion chromium prefetched')).catch(e => { console.error('ensureBrowser failed:', e); process.exit(1); })" \
-  && echo "[chromium cache layout]" \
-  && find /root -type d -name "*remotion*" -o -name "*chrome*" -o -name "*chromium*" -o -name "*puppeteer*" 2>/dev/null | head -20 \
-  && cd / && rm -rf /tmp/remotion-prefetch
+  && echo "[chromium cache layout]" && ls -la /opt/puppeteer-cache 2>&1 | head -5 \
+  && find /opt/puppeteer-cache -name 'headless_shell' -o -name 'chrome' 2>/dev/null | head -3 \
+  && find / -name 'headless_shell' -not -path '/proc/*' 2>/dev/null | head -3
 
 # The base image already declares the workdir, server CMD, and EXPOSE 3000.
 # Do NOT override CMD — the sandbox server must remain the entrypoint.

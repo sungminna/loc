@@ -20,7 +20,7 @@
 // REPLICATE_API_TOKEN.
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { spawnSync, type SpawnSyncReturns } from "node:child_process";
+import { spawn } from "node:child_process";
 import { api, type TemplateJson, type TopicJson } from "./lib/api";
 
 // ─── Brief shape (mirrors content-plan output) ───────────────────────
@@ -124,13 +124,56 @@ async function fail(stage: string, err: unknown): Promise<never> {
 
 // ─── Subprocess helpers ──────────────────────────────────────────────
 
-function runBash(cmd: string, timeoutMs: number): SpawnSyncReturns<string> {
-  return spawnSync("bash", ["-c", cmd], {
-    encoding: "utf8",
-    timeout: timeoutMs,
-    env: process.env,
-    cwd: "/workspace",
-    maxBuffer: 32 * 1024 * 1024,
+interface BashResult {
+  status: number | null;
+  signal: NodeJS.Signals | null;
+  stdout: string;
+  stderr: string;
+  timedOut: boolean;
+}
+
+// Async-spawn wrapper that owns timeout enforcement ourselves. We do NOT
+// rely on spawnSync({timeout}) — empirically Bun's spawnSync timeout option
+// fails to kill long-running children (a stage_plan run sat for 46+ min
+// past its 8-min budget), which would not have happened if SIGKILL had
+// fired. With this version we register our own setTimeout that calls
+// child.kill("SIGKILL") on the deadline; the kill is unambiguous.
+function runBash(cmd: string, timeoutMs: number): Promise<BashResult> {
+  return new Promise((resolve) => {
+    const child = spawn("bash", ["-c", cmd], {
+      env: process.env,
+      cwd: "/workspace",
+    });
+    let stdout = "";
+    let stderr = "";
+    let timedOut = false;
+
+    child.stdout?.on("data", (d: Buffer) => {
+      stdout += d.toString();
+    });
+    child.stderr?.on("data", (d: Buffer) => {
+      stderr += d.toString();
+    });
+
+    const timer = setTimeout(() => {
+      timedOut = true;
+      try {
+        child.kill("SIGKILL");
+      } catch {
+        // child may have already exited between the timer firing and the
+        // kill — harmless.
+      }
+    }, timeoutMs);
+
+    child.on("close", (code, signal) => {
+      clearTimeout(timer);
+      resolve({ status: code, signal, stdout, stderr, timedOut });
+    });
+    child.on("error", (err) => {
+      clearTimeout(timer);
+      stderr += `\n[spawn error] ${err.message}`;
+      resolve({ status: -1, signal: null, stdout, stderr, timedOut });
+    });
   });
 }
 
@@ -138,14 +181,12 @@ function runBash(cmd: string, timeoutMs: number): SpawnSyncReturns<string> {
 // (write research.md, or write brief.json) so even if the model stops early
 // it can't prevent the orchestrator from advancing — the next stage runs
 // regardless, and a missing artifact is handled at the catch site.
-function runClaude(opts: {
+async function runClaude(opts: {
   prompt: string;
   promptFile: string;
   timeoutMs: number;
-}): SpawnSyncReturns<string> {
+}): Promise<BashResult> {
   writeFileSync(opts.promptFile, opts.prompt);
-  // Pipe via file → cat → stdin to preserve real newlines (same idea as
-  // the original spawner). Permission flags repeated for explicitness.
   const cmd =
     `cat "${opts.promptFile}" | claude -p ` +
     `--output-format stream-json ` +
@@ -250,7 +291,7 @@ Constraints:
 - Never invent statistics. If you can't cite the source, omit it.
 - If everything fails, write a stub research.md with a single line noting the failure — the next stage will compensate.`;
 
-  const r = runClaude({
+  const r = await runClaude({
     prompt,
     promptFile: `${RUN_DIR}/.research-prompt.txt`,
     timeoutMs: 8 * 60 * 1000,
@@ -325,7 +366,7 @@ Use the Write tool to save the JSON to \`${briefPath}\`. Do NOT print the brief 
 
 ${ctx.template?.kind === "reel-video" ? `IMPORTANT: this run uses a video-reel template. Still produce reel.slides[] (the storyboard skill turns it into video scenes later). Do not invent video.scenes[] yourself.` : ""}`;
 
-    const r = runClaude({
+    const r = await runClaude({
       prompt,
       promptFile: `${RUN_DIR}/.plan-prompt.txt`,
       timeoutMs: 8 * 60 * 1000,
@@ -390,7 +431,7 @@ Read \`${briefPath}\` and \`${RUN_DIR}/topic.json\` and \`${RUN_DIR}/research.md
 
 Use 3-5 scenes. Total durationSec should sum to ~22 seconds. Re-write the entire brief.json with the merged content. Use Read + Write tools. Once written, exit.`;
 
-  const r = runClaude({
+  const r = await runClaude({
     prompt,
     promptFile: `${RUN_DIR}/.storyboard-prompt.txt`,
     timeoutMs: 6 * 60 * 1000,
@@ -429,7 +470,7 @@ async function stage_image(ctx: Context, brief: Brief): Promise<Brief> {
 
       const composedPrompt = composeSlidePrompt(slide.bgImagePrompt, ctx.topic.imageStylePrompt, ctx.template);
       const quality = mode === "ai-first-only" ? "high" : "auto";
-      const r = runBash(
+      const r = await runBash(
         [
           `bun src/sandbox/image-gen.ts gen`,
           `--prompt ${shellQuote(composedPrompt)}`,
@@ -472,7 +513,7 @@ async function stage_image(ctx: Context, brief: Brief): Promise<Brief> {
       const sc = scenes[i]!;
       if (sc.firstFrameImagePrompt && !sc.firstFrameImageR2Key) {
         const prompt = composeSlidePrompt(sc.firstFrameImagePrompt, ctx.topic.imageStylePrompt, ctx.template);
-        const r = runBash(
+        const r = await runBash(
           [
             `bun src/sandbox/image-gen.ts gen`,
             `--prompt ${shellQuote(prompt)}`,
@@ -506,7 +547,7 @@ async function stage_image(ctx: Context, brief: Brief): Promise<Brief> {
       ctx.topic.imageStylePrompt,
       ctx.template,
     );
-    const r = runBash(
+    const r = await runBash(
       [
         `bun src/sandbox/image-gen.ts gen`,
         `--prompt ${shellQuote(prompt)}`,
@@ -566,7 +607,7 @@ async function stage_video(ctx: Context, brief: Brief): Promise<Brief> {
       `--scene-index ${i}`,
     ].filter(Boolean).join(" ");
 
-    const r = runBash(args, 8 * 60 * 1000);
+    const r = await runBash(args, 8 * 60 * 1000);
     if (r.status !== 0) {
       console.error(`[video] scene ${i} failed (exit=${r.status}): ${(r.stderr ?? "").slice(-300)}`);
       continue;
@@ -600,7 +641,7 @@ async function stage_audio(ctx: Context): Promise<{ url?: string; attribution?: 
     `--duration ${duration}`,
   ].filter(Boolean).join(" ");
 
-  const r = runBash(args, 30_000);
+  const r = await runBash(args, 30_000);
   if (r.status !== 0) {
     console.error(`[audio] select-audio failed: ${(r.stderr ?? "").slice(-300)} — continuing without BGM`);
     return null;
@@ -649,7 +690,7 @@ async function stage_render(
       accent ? `--accent ${shellQuote(accent)}` : "",
     ].filter(Boolean).join(" ");
 
-    const r = runBash(args, 10 * 60 * 1000);
+    const r = await runBash(args, 10 * 60 * 1000);
     if (r.status !== 0) {
       await fail("render", `render-reel failed (exit=${r.status}): ${(r.stderr ?? "").slice(-500)}`);
     }
@@ -665,7 +706,7 @@ async function stage_render(
       `--brief ${RUN_DIR}/brief.json`,
       `--out-dir ${RUN_DIR}`,
     ].join(" ");
-    const r = runBash(args, 3 * 60 * 1000);
+    const r = await runBash(args, 3 * 60 * 1000);
     if (r.status !== 0) {
       console.error(`[render] threads image failed (exit=${r.status}): ${(r.stderr ?? "").slice(-300)}`);
     } else {
@@ -706,7 +747,7 @@ async function stage_publish(
       slug ? `--template-slug ${shellQuote(slug)}` : "",
       `--lang ${lang}`,
     ].filter(Boolean).join(" ");
-    const r = runBash(args, 8 * 60 * 1000);
+    const r = await runBash(args, 8 * 60 * 1000);
     igOk = r.status === 0;
     if (!igOk) {
       console.error(`[publish ig] exit=${r.status}: ${(r.stderr ?? "").slice(-500)}`);
@@ -727,7 +768,7 @@ async function stage_publish(
       slug ? `--template-slug ${shellQuote(slug)}` : "",
       ctx.topic.threadsFormat === "image" && rendered.threadsKey ? `--image-r2-key ${rendered.threadsKey}` : "",
     ].filter(Boolean).join(" ");
-    const r = runBash(args, 5 * 60 * 1000);
+    const r = await runBash(args, 5 * 60 * 1000);
     threadsOk = r.status === 0;
     if (!threadsOk) {
       console.error(`[publish threads] exit=${r.status}: ${(r.stderr ?? "").slice(-500)}`);

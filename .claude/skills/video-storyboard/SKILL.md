@@ -62,15 +62,26 @@ The orchestrator turns each scene into a Seedance 2.0 prediction and writes back
 ## Prompt-writing rules
 
 Write each `videoPrompt` as **one paragraph** with this scaffold:
-> [Subject doing action], [camera move], [lighting/mood], [style/lens cue], [optional reference labels].
+> [Subject doing a specific physical action], [camera move with speed], [named light source], [lens / film stock cue], [one material or imperfection].
+
+The discipline is the same as `image-gen`'s 5-section structure: scene→subject→details, with constraints implicit in what you don't ask for. Name a real lens, a real light source, and at least one tactile material per scene. Don't ask for "cinematic vibes" — describe a moment.
 
 Concrete examples:
 
-- HOOK: "A young office worker freezes mid-sentence, eyes widening as a notification glows on the laptop screen, slow dolly in on the face, blue-hour overcast window light, cinematic 35mm shallow depth of field."
-- PAYOFF: "A pair of hands slides three magnetic cards across a wooden desk, top-down shot panning right, warm tungsten lamp, editorial product still."
-- ACTION: "A woman writes a single line in a paper notebook, close-up on the pen tip, soft daylight from a side window, documentary handheld."
+- HOOK: "A young office worker freezes mid-sentence, eyes widening as a single Slack notification glows on the laptop screen. Slow dolly-in on the face over 2 seconds, blue-hour overcast light through a side window, 35mm film with shallow depth of field, the keyboard out of focus, a coffee ring on the desk visible at the edge of frame."
+- PAYOFF: "A pair of weathered hands slides three magnetic cards across a wooden desk one at a time. Top-down shot panning right, single warm tungsten desk lamp, 50mm prime, the wood grain visible, the corners of the cards slightly worn."
+- ACTION: "A woman writes a single line in a paper notebook with a fountain pen, close-up on the pen tip leaving a small ink bloom on the page. Documentary handheld, soft daylight from a side window, 35mm film grain, ink-spot imperfection visible."
 
 Avoid baking on-screen text — the composition handles typography. Keep dialogue rare; only when a single line of voice would land hard, use double quotes (e.g. `The host turns to camera and says: "지금 시작하세요."`).
+
+### Anti-slop list (REMOVE these from any `videoPrompt` or frame prompt)
+
+These words push Seedance and gpt-image-2 into synthetic mode:
+- ❌ `stunning`, `incredible`, `epic`, `masterpiece`, `breathtaking`, `award-winning`, `cinematic masterpiece`, `8K`, `4K`, `ultra-realistic`, `hyper-realistic`
+- ❌ `glowing orb`, `holographic interface`, `dramatic god rays`, `floating particles`, `magic energy aura`, `cyberpunk neon city`
+- ❌ `robot hand reaching toward human hand`, `brain made of circuits`, `perfect minimalist office`, `smiling business team in a sunlit conference room`
+- ❌ Style soup like `minimalist brutalist editorial luxury photoreal cinematic` — pick ONE register
+- ❌ Emotion abstractions like `evoking trust`, `feeling of innovation` — replace with what's literally in the frame
 
 ## When to use a first-frame image
 

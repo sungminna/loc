@@ -112,10 +112,40 @@ What slide 5 must NOT be:
 ### Image prompts (sound-off design)
 - ~50% of Reels are watched muted — the visual must carry the meaning.
 - Single focal subject, high contrast against background, deliberate negative space (text overlays sit there).
-- Cinematic vocabulary: "50mm lens, soft daylight, shallow depth of field, editorial composition".
 - NEVER request text inside the image — typography is the template's job. The composition will overprint kicker + headline + body.
-- Avoid: stock-photo greys, generic office desk shots, AI clichés (perfect rooms, glowing orbs, robotic hands), clichéd "AI on phone screen" mockups.
-- The `imageStylePrompt` on the topic + `bgPromptTemplate` on the template are concatenated automatically. Your `bgImagePrompt` is the *content* layer.
+- The `imageStylePrompt` on the topic + `bgPromptTemplate` on the template are concatenated automatically by the orchestrator (`composeSlidePrompt`). Your `bgImagePrompt` is the *content* layer — sections 1-3 of the gpt-image-2 template only.
+
+#### Mandatory structure for every `bgImagePrompt`
+
+The orchestrator passes your prompt to gpt-image-2, which weighs early tokens hardest. Write each `bgImagePrompt` in this fixed three-section order — sections 4 and 5 are appended automatically; do not duplicate them.
+
+```
+[Scene]    One sentence: where, when, atmosphere. Anchor in a real place if you can — a 2am kitchen, a Seoul side-alley after rain, a dim hospital corridor at shift-change. Not "tech vibes", not "modern lifestyle".
+[Subject]  One sentence: the single focal thing the viewer reads in 0.5s. Concrete noun, not concept. "A half-eaten ramen cup pushed to the desk edge", "a paper printout with one circled red number", "the back of a barista's hand sliding a receipt".
+[Details]  1-2 sentences naming lens + light source + at least one material/imperfection. Examples: "35mm film, single tungsten desk lamp from the right, the rest in shadow"; "documentary 50mm, shallow depth of field, dust visible in the window light, chipped paint on the doorframe".
+```
+
+End with a 4-7 word tonality cue: "muted earth tones, one warm amber accent" / "cool blue dusk with a single neon-pink hit". The orchestrator overlays the template's `accentColor` after your tonality, so the two should agree on warm-vs-cool register.
+
+#### Photo vocabulary that flips photoreal mode on
+
+Use these words; they're what separates "documentary photo" from "AI illustration":
+- Lens: `35mm film`, `50mm prime`, `85mm portrait`, `medium format`, `Polaroid SX-70`, `disposable camera`
+- Light source (NAME it): `single tungsten desk lamp`, `north window soft daylight`, `mixed fluorescent + neon`, `golden hour through dust`, `blue-hour overcast`
+- Material / imperfection: `chipped paint`, `wet concrete`, `worn canvas`, `condensation on glass`, `coffee stain`, `dog-eared paper`, `frayed cuff`, `slight skin redness, hair flyaway`
+- Mood in *nouns*, not adjectives: not "nostalgic" but "a half-empty mug, the radio is on, rain on the window".
+
+#### Anti-slop list (REMOVE these from any `bgImagePrompt`)
+
+These words push gpt-image-2 into synthetic concept-art mode. Strip them:
+- ❌ `stunning`, `incredible`, `epic`, `masterpiece`, `gorgeous`, `breathtaking`, `award-winning`, `insane detail`, `jaw-dropping`
+- ❌ `8K`, `4K`, `ultra-realistic`, `hyper-realistic` — use `35mm film` or `documentary photograph` instead
+- ❌ `glowing orb`, `holographic interface`, `cyberpunk neon city`, `dramatic god rays`, `floating particles`, `magic energy aura`
+- ❌ `robot hand reaching toward human hand`, `brain made of circuits`, `perfect minimalist office`, `smiling business team in a sunlit conference room`
+- ❌ Style soup: `minimalist brutalist editorial luxury photoreal cinematic` — pick ONE register and commit
+- ❌ Emotion abstractions: `evoking trust`, `feeling of innovation`, `sense of empowerment` — replace with what's literally in the frame
+
+See `.claude/skills/image-gen/SKILL.md` for the full vocabulary cheatsheet and 4 worked examples (AI-tools, finance, trends, Threads card).
 
 ### slides[0].bgImagePrompt — the cover frame (treat it specially)
 
@@ -162,6 +192,60 @@ Practical rules:
 - `threadsTopicTag`: pick the single most-relevant indexed topic. This becomes Threads' `topic_tag` API param (one per post). No `#`, no spaces in the tag itself.
 - If `topic.hashtagMode === "fixed"`: still emit `hashtags` (the publisher will ignore yours and use `topic.fixedHashtags`).
 - If `topic.hashtagMode === "mixed"`: emit your own; publisher will merge with `fixedHashtags` and dedupe.
+
+## Write like a human (anti-AI-tells)
+
+Read every line you draft aloud in your head. If it sounds like a brand template, an LLM has touched it too long. The 2026 reader has been pattern-matched against thousands of AI captions; the tells below kill credibility within one second of reading.
+
+### Korean tells (drop on sight)
+
+**Openers** (none of these — ever):
+- ❌ "오늘은 ~에 대해 알려드릴게요"
+- ❌ "여러분 안녕하세요"
+- ❌ "혹시 ~ 알고 계신가요?"
+- ❌ "이번 영상에서는"
+- ❌ "정말 놀라운 사실은"
+- ❌ "한 번쯤 들어보셨을"
+
+**Filler / scaffolding**:
+- ❌ "결론적으로", "정리하자면", "마무리하며" — sounds like an essay outline
+- ❌ "~ 라고 할 수 있습니다" → use "~ 다" (단정형) or fragment
+- ❌ "여러분도 한 번 시도해 보세요" → too generic; give a specific action
+- ❌ "정말 대단하죠?" / "놀랍지 않나요?" — telling the viewer what to feel
+- ❌ "꼭 기억해 두세요" / "절대 잊지 마세요" — preachy
+
+**Closers**:
+- ❌ "감사합니다 / 도움이 됐길 바랍니다"
+- ❌ "공감되시면 좋아요 부탁드려요"
+- ❌ "다음 영상에서 만나요"
+
+**What to do instead**: drop into the middle of a thought as if texting a friend who already knows the context.
+- ✓ "어제 ___ 보고 머리 좀 돌았는데"
+- ✓ "1년 동안 매일 이 짓 했더니 ___"
+- ✓ "이거 하나 바꿨더니 진짜로 됐다"
+- ✓ Sentence fragments are fine. "월요일 아침. 확인할 것 하나."
+
+### English tells (drop on sight)
+
+- ❌ "In today's fast-paced world", "It's no secret that", "When it comes to"
+- ❌ "Let's dive in", "Buckle up", "Without further ado"
+- ❌ Em-dash flourishes used as filler — em-dashes are fine when load-bearing, but the AI default is to sprinkle them
+- ❌ Triadic listing for cadence ("powerful, elegant, intuitive")
+- ❌ "Game-changer", "revolutionary", "next-level", "unlock", "harness", "leverage", "supercharge"
+- ❌ "POV:", "Wait for it...", "Tell me without telling me", "If you know, you know"
+- ❌ Closing with "What do you think? Let me know in the comments" — too low-energy
+
+**What to do instead**: write the way a 31-year-old who's been doing this work for five years would text it to a friend at 11pm. Specific, slightly tired, occasionally funny, not selling anything.
+
+### Universal humanity rules
+
+1. **One concrete moment beats five abstract claims.** "수입의 47%를 월세로 내는 사회 초년생" lands; "최근 청년들의 주거 부담이 높아지고 있다" doesn't.
+2. **Asymmetric punctuation is human.** A trailing period, an unfinished thought, a sentence that's just "응." Real writers don't keep cadence perfect.
+3. **Specific brand / place names build trust.** Not "a popular AI tool" — `Claude`, `Cursor`, `네이버 검색량`, `삼성동`, `홍대 정문 앞 편의점`. Specificity is the cheapest credibility signal.
+4. **Confess one limit.** Add a small "잘 모르겠지만", "이건 내 추측이지만", "100% 확신은 못 하는데" — overconfidence reads as bot.
+5. **No triadic balance.** "fast, simple, and powerful" / "더 쉽고 더 빠르고 더 정확하게" — the rhythm itself is an AI fingerprint. Break the symmetry.
+6. **Numbers should feel measured, not rounded.** `47.3%` and `3주 12시간` beat `약 50%` and `한 달 정도`. Round numbers are how AI hedges; measured numbers are how humans report.
+7. **Don't explain the joke or the takeaway.** If you wrote a hook and then the next line summarizes it ("이게 바로 ___ 라는 거예요"), delete the explanation.
 
 ## Originality
 
@@ -249,14 +333,18 @@ The Reels caption and the Threads body do **different** algorithmic jobs — wri
 
 ## Self-critique loop (mandatory)
 
-After your first draft, check yourself:
+After your first draft, check yourself in this order. Revise once before writing.
+
 1. Read slide 1's headline aloud. Would *you* swipe down within 1 second of seeing it muted? If yes, rewrite.
 2. Is slide 5 actionable in the next 24 hours? If not, rewrite.
 3. Does each slide deliver new info, or is slide 3 a reheated slide 2?
 4. Threads: is the first line a punchline that stands alone? If it depends on the body, hoist it.
 5. Are any numbers fabricated? Cross-check against research.md. If it's not in there, drop it.
+6. **Anti-AI-tells sweep.** Scan every line of `caption.instagram`, `caption.threads`, `threads.text`, and every `headline` / `body` for the banned openers, scaffolding, closers, and triadic-balance phrases listed under "Write like a human". If you find one, rewrite. Adjectives like "stunning / incredible / amazing / 정말 놀라운" are auto-fail.
+7. **Image-prompt sweep.** For every `bgImagePrompt`: does it follow Scene → Subject → Details? Does it name a lens AND a light source AND one material/imperfection? Are there any banned words from the anti-slop list? If a prompt reads like "stunning minimalist tech aesthetic with neon glow", rewrite it as a concrete moment.
+8. **Round-number sweep.** If you wrote `약 50%`, `한 달 정도`, `수십만 명`, replace with the measured number from research.md or drop the claim.
 
-You may revise once before writing the brief.
+If a revision still fails any check, do another pass. Do not write the brief until all eight pass.
 
 ## Image-prompt rules (interplay with imageMode)
 

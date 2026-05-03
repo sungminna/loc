@@ -5,10 +5,16 @@ import { runs, topics, accounts, type RunStatus } from "@db/schema";
 import type { Env } from "@shared/env";
 import { decryptToken } from "./crypto";
 
-// 30 min: enough for the full pipeline including a video-reel run
-// (storyboard + 4×Seedance + render). Card-news runs typically finish in 5-8
-// min; this is the worst-case ceiling, not the expected duration.
-const CLAUDE_TIMEOUT_MS = 30 * 60 * 1000;
+// 60 min: this is the Cloudflare-side hard ceiling. The orchestrator owns
+// per-stage timeouts inside (research 8m + plan 8m×2 + image + render 10m +
+// publish 13m for card-news; ~+30m for video-reel templates that add
+// storyboard + N×Seedance), and bounds them with its own SIGKILL on the
+// process group. This worker-side ceiling exists only as a last-resort
+// guard if the in-process timer somehow fails to fire. Card-news runs
+// typically finish in 5-8 min; video-reel runs in 30-50 min. Keep the
+// ceiling well above the expected p99 so a slow but progressing run isn't
+// killed mid-render and forced to retry from scratch.
+const CLAUDE_TIMEOUT_MS = 60 * 60 * 1000;
 
 export async function spawnSandboxRun(
   env: Env,

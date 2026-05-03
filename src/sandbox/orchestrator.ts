@@ -134,19 +134,35 @@ interface BashResult {
 
 // Async-spawn wrapper that owns timeout enforcement ourselves. We do NOT
 // rely on spawnSync({timeout}) — empirically Bun's spawnSync timeout option
-// fails to kill long-running children (a stage_plan run sat for 46+ min
-// past its 8-min budget), which would not have happened if SIGKILL had
-// fired. With this version we register our own setTimeout that calls
-// child.kill("SIGKILL") on the deadline; the kill is unambiguous.
+// failed to kill long-running children (a stage_plan run sat for 46+ min
+// past its 8-min budget). With this version we register our own
+// setTimeout to kill on the deadline.
+//
+// Critical detail: the command is `bash -c "cat … | claude -p …"`, a
+// pipeline of three processes. child.kill("SIGKILL") sends the signal
+// only to bash; cat and claude are reparented to init and keep running,
+// so the timeout would advance the orchestrator while the descendants
+// continue burning resources and racing to write artifacts the next
+// stage will read. To kill the whole pipeline we spawn the child as a
+// new process-group leader (`detached: true`) and signal the entire
+// group with the negative-PID convention `process.kill(-pid, signal)`.
 function runBash(cmd: string, timeoutMs: number): Promise<BashResult> {
   return new Promise((resolve) => {
     const child = spawn("bash", ["-c", cmd], {
       env: process.env,
       cwd: "/workspace",
+      detached: true, // becomes process-group leader; -pid kills the group
     });
     let stdout = "";
     let stderr = "";
     let timedOut = false;
+    let resolved = false;
+
+    const finalize = (result: BashResult): void => {
+      if (resolved) return;
+      resolved = true;
+      resolve(result);
+    };
 
     child.stdout?.on("data", (d: Buffer) => {
       stdout += d.toString();
@@ -157,22 +173,35 @@ function runBash(cmd: string, timeoutMs: number): Promise<BashResult> {
 
     const timer = setTimeout(() => {
       timedOut = true;
+      // Kill the entire process group — bash, cat, claude (or whichever
+      // pipeline). On `close` we record the timeout reason regardless of
+      // which signal the OS reports, since the SIGKILL we just sent is
+      // why the group exited.
       try {
-        child.kill("SIGKILL");
+        if (child.pid) process.kill(-child.pid, "SIGKILL");
       } catch {
-        // child may have already exited between the timer firing and the
-        // kill — harmless.
+        // ESRCH if the group already exited between the timer firing and
+        // this kill; harmless.
       }
+      // Defense-in-depth: if `close` somehow doesn't fire within 5 s of
+      // the kill (it always should, but we want a hard ceiling), resolve
+      // the promise ourselves so the orchestrator can advance.
+      setTimeout(() => {
+        if (!resolved) {
+          stderr += `\n[runBash] forced resolve after kill — close event never fired`;
+          finalize({ status: -1, signal: "SIGKILL", stdout, stderr, timedOut: true });
+        }
+      }, 5000);
     }, timeoutMs);
 
     child.on("close", (code, signal) => {
       clearTimeout(timer);
-      resolve({ status: code, signal, stdout, stderr, timedOut });
+      finalize({ status: code, signal, stdout, stderr, timedOut });
     });
     child.on("error", (err) => {
       clearTimeout(timer);
       stderr += `\n[spawn error] ${err.message}`;
-      resolve({ status: -1, signal: null, stdout, stderr, timedOut });
+      finalize({ status: -1, signal: null, stdout, stderr, timedOut });
     });
   });
 }

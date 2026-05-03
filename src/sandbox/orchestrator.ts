@@ -225,6 +225,22 @@ async function runClaude(opts: {
   return runBash(cmd, opts.timeoutMs);
 }
 
+// Pluck the most informative line out of a child's stderr blob. Stack-frame
+// lines (`at foo (file:1:2)`, `at processTicksAndRejections (native:7:39)`)
+// dominate the tail of any Node/Bun error and tell the user nothing — the
+// actual failure is the `Error: …` line at the top. Pick that first; fall
+// back to the first non-stack line.
+function summarizeStderr(stderr: string, max = 600): string {
+  const lines = stderr.split("\n").map((l) => l.trim()).filter(Boolean);
+  const isStackFrame = (l: string): boolean =>
+    /^at\s/.test(l) || /\(native:\d+:\d+\)$/.test(l);
+  const errLine = lines.find((l) => /Error:/.test(l) && !isStackFrame(l));
+  if (errLine) return errLine.slice(0, max);
+  const meaningful = lines.find((l) => !isStackFrame(l));
+  if (meaningful) return meaningful.slice(0, max);
+  return (lines[0] ?? "").slice(0, max);
+}
+
 // Parse claude's stream-json output and accumulate cost/tokens into the
 // process-level usage struct. Returns the final error message if the
 // session ended in error.
@@ -361,7 +377,9 @@ Inputs:
 - \`${RUN_DIR}/research.md\`
 ${ctx.template ? `- \`${RUN_DIR}/template.json\` (the chosen Remotion template — bgPromptTemplate is style overlay, accentColor is the dominant brand color)` : ""}
 
-Read these, then follow the rules in \`.claude/skills/content-plan/SKILL.md\` to draft the brief. Apply the persona prompt, the retention-first composition rules, the legal safety rails, and the slide-0 cover-frame discipline. Run the self-critique loop once before writing.
+Read these, then follow the rules in \`.claude/skills/content-plan/SKILL.md\` to draft the brief. Apply the persona prompt, the retention-first composition rules, the legal safety rails, the slide-0 cover-frame discipline, and the **anti-AI-tells** section (no "오늘은…", no "여러분", no em-dash flourishes, no "in today's fast-paced world", no listicle scaffolding, no aspirational adjectives like "stunning/epic/incredible"). Read the copy aloud in your head — if it sounds like a brand-template caption, rewrite it. Run the self-critique loop once before writing.
+
+For \`bgImagePrompt\` fields specifically: write them in the documented gpt-image-2 order — **Scene → Subject → Key details → Use case → Constraints**. Use camera/lens/lighting/material vocabulary (e.g. "35mm film", "soft window light", "wet asphalt", "chipped paint", "shallow depth of field"). Describe a *real moment* a photographer captured, not a concept. Never bake on-screen text into the image; the template renders typography. See \`.claude/skills/image-gen/SKILL.md\` for the full vocabulary cheatsheet and worked examples.
 
 The brief MUST be valid JSON matching this schema:
 
@@ -515,7 +533,7 @@ async function stage_image(ctx: Context, brief: Brief): Promise<Brief> {
         4 * 60 * 1000,
       );
       if (r.status !== 0) {
-        console.error(`[image] slide ${i} gen failed (exit=${r.status}): ${(r.stderr ?? "").slice(-300)}`);
+        console.error(`[image] slide ${i} gen failed (exit=${r.status}): ${summarizeStderr(r.stderr ?? "", 300)}`);
         continue;
       }
       const r2Key = parseImageGenStdout(r.stdout ?? "");
@@ -561,7 +579,7 @@ async function stage_image(ctx: Context, brief: Brief): Promise<Brief> {
           const r2Key = parseImageGenStdout(r.stdout ?? "");
           if (r2Key) scenes[i] = { ...sc, firstFrameImageR2Key: r2Key };
         } else {
-          console.error(`[image] scene ${i} firstFrame failed: ${(r.stderr ?? "").slice(-300)}`);
+          console.error(`[image] scene ${i} firstFrame failed: ${summarizeStderr(r.stderr ?? "", 300)}`);
         }
       }
     }
@@ -595,7 +613,7 @@ async function stage_image(ctx: Context, brief: Brief): Promise<Brief> {
       const r2Key = parseImageGenStdout(r.stdout ?? "");
       if (r2Key) brief.threads = { ...brief.threads, bgImageR2Key: r2Key };
     } else {
-      console.error(`[image] threads bg failed: ${(r.stderr ?? "").slice(-300)}`);
+      console.error(`[image] threads bg failed: ${summarizeStderr(r.stderr ?? "", 300)}`);
     }
   }
 
@@ -638,7 +656,7 @@ async function stage_video(ctx: Context, brief: Brief): Promise<Brief> {
 
     const r = await runBash(args, 8 * 60 * 1000);
     if (r.status !== 0) {
-      console.error(`[video] scene ${i} failed (exit=${r.status}): ${(r.stderr ?? "").slice(-300)}`);
+      console.error(`[video] scene ${i} failed (exit=${r.status}): ${summarizeStderr(r.stderr ?? "", 300)}`);
       continue;
     }
     const r2Key = parseVideoGenStdout(r.stdout ?? "");
@@ -672,7 +690,7 @@ async function stage_audio(ctx: Context): Promise<{ url?: string; attribution?: 
 
   const r = await runBash(args, 30_000);
   if (r.status !== 0) {
-    console.error(`[audio] select-audio failed: ${(r.stderr ?? "").slice(-300)} — continuing without BGM`);
+    console.error(`[audio] select-audio failed: ${summarizeStderr(r.stderr ?? "", 300)} — continuing without BGM`);
     return null;
   }
 
@@ -721,7 +739,7 @@ async function stage_render(
 
     const r = await runBash(args, 10 * 60 * 1000);
     if (r.status !== 0) {
-      await fail("render", `render-reel failed (exit=${r.status}): ${(r.stderr ?? "").slice(-500)}`);
+      await fail("render", `render-reel failed (exit=${r.status}): ${summarizeStderr(r.stderr ?? "", 500)}`);
     }
     out.reelKey = `runs/${RUN_ID}/reel.mp4`;
     out.coverKey = `runs/${RUN_ID}/cover.jpg`;
@@ -737,7 +755,7 @@ async function stage_render(
     ].join(" ");
     const r = await runBash(args, 3 * 60 * 1000);
     if (r.status !== 0) {
-      console.error(`[render] threads image failed (exit=${r.status}): ${(r.stderr ?? "").slice(-300)}`);
+      console.error(`[render] threads image failed (exit=${r.status}): ${summarizeStderr(r.stderr ?? "", 300)}`);
     } else {
       out.threadsKey = `runs/${RUN_ID}/threads.jpg`;
     }
@@ -779,7 +797,7 @@ async function stage_publish(
     const r = await runBash(args, 8 * 60 * 1000);
     igOk = r.status === 0;
     if (!igOk) {
-      console.error(`[publish ig] exit=${r.status}: ${(r.stderr ?? "").slice(-500)}`);
+      console.error(`[publish ig] exit=${r.status}: ${summarizeStderr(r.stderr ?? "", 500)}`);
     }
   }
 
@@ -800,7 +818,7 @@ async function stage_publish(
     const r = await runBash(args, 5 * 60 * 1000);
     threadsOk = r.status === 0;
     if (!threadsOk) {
-      console.error(`[publish threads] exit=${r.status}: ${(r.stderr ?? "").slice(-500)}`);
+      console.error(`[publish threads] exit=${r.status}: ${summarizeStderr(r.stderr ?? "", 500)}`);
     }
   }
 
@@ -814,21 +832,57 @@ function composeSlidePrompt(
   styleOverlay: string,
   template: TemplateJson | null,
 ): string {
-  // Content first (the model weights early tokens heaviest), then style,
-  // then color directive, then a typography-safe-zone reminder.
+  // gpt-image-2 weighs early tokens heaviest and reads prompts best when
+  // they follow the documented order: Scene → Subject → Details → Use
+  // case → Constraints. The content-plan skill already writes the
+  // Scene/Subject/Details portion; we append the use case and the
+  // negative constraints (the section the OpenAI cookbook calls out as
+  // "where most mediocre prompts fail silently"). We also strip vague
+  // praise that downgrades photoreal mode.
   const parts: string[] = [];
-  parts.push(contentPrompt.trim());
-  parts.push(
-    "Vertical 2:3 cover frame, single dominant subject, generous negative space in upper third for kicker text and middle for headline. No on-screen text, no logos, no watermark.",
-  );
-  const style = [styleOverlay, template?.bgPromptTemplate].filter((s) => s && s.trim()).join(". ");
-  if (style) parts.push(`Style: ${style}.`);
+  const cleaned = stripVaguePraise(contentPrompt.trim());
+  parts.push(cleaned);
+
+  const style = [styleOverlay, template?.bgPromptTemplate]
+    .map((s) => (s ? stripVaguePraise(s.trim()) : ""))
+    .filter((s) => s.length > 0)
+    .join(". ");
+  if (style) parts.push(`Visual treatment: ${style}.`);
+
   if (template?.accentColor) {
     parts.push(
-      `Color palette anchored on ${template.accentColor} as the dominant accent, with secondary tones that harmonize cleanly with the template gradient backdrop so the cover and following template-rendered slides read as one coherent deck.`,
+      `Color anchor: ${template.accentColor} reads as the dominant accent (one or two surfaces only — a fabric, a sign, a window-light cast); the rest of the palette stays muted so the typography overlay sits cleanly. The cover and the template-rendered slides that follow must read as one coherent deck, not a brighter outlier.`,
     );
   }
+
+  // Use case — telling the model what the artifact is for materially
+  // changes how it composes. "Cover frame for a Reel" produces editorial
+  // composition; without it the model defaults to centered stock layouts.
+  parts.push(
+    "Use case: a vertical 2:3 cover frame for an Instagram Reel. The subject sits in the lower-right two-thirds; the upper third and the upper-left are intentionally empty for a kicker label and a headline overlay. Frame as a candid, unposed editorial photograph captured in the moment — not a studio composite.",
+  );
+
+  // Constraints — explicit negatives. Listed in priority order. The "no
+  // text" line is repeated because gpt-image-2 still bakes letters into
+  // ~10% of outputs without it.
+  parts.push(
+    "Constraints: no on-screen text, no captions, no watermark, no logos, no UI mockups, no brand names visible, no QR codes. No glowing orbs, no robot hands, no holographic interfaces, no perfect symmetric studio set, no over-saturated HDR look. Keep real-world imperfection — visible texture, soft natural light, believable shadows.",
+  );
+
   return parts.join(" ");
+}
+
+// gpt-image-2 demonstrably degrades photorealism mode when prompts
+// include aspirational adjectives ("stunning", "epic", "masterpiece").
+// They route the model toward synthetic concept-art aesthetics. Strip
+// them defensively before sending — the content-plan SKILL also bans
+// them, but topic.imageStylePrompt and template.bgPromptTemplate are
+// user-authored and bypass that gate.
+function stripVaguePraise(s: string): string {
+  return s.replace(
+    /\b(stunning|incredible|epic|masterpiece|gorgeous|insane(?:ly)?\s+detailed?|award[- ]winning|breathtaking|magnificent|jaw[- ]dropping|ultra[- ]realistic|hyper[- ]?realistic|8k|4k|cinematic\s+masterpiece)\b[\s,.]*/gi,
+    "",
+  );
 }
 
 function composeHashtags(topic: TopicJson, brief: Brief): string[] {

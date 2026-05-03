@@ -252,13 +252,35 @@ function parseOrchestratorStdout(stdout: string): ClaudeTotals {
   return totals;
 }
 
-// Reduce the stderr/stdout blob to something a human can read in the dashboard
-// without scrolling 500 lines of stream-json. Prefer the last non-empty line of
-// stderr; fall back to the parsed stream's lastError; fall back to a tail of stdout.
+// Reduce the stderr blob to something a human can read in the dashboard.
+// Prefer the most informative line — the orchestrator's `[stage] msg` lines,
+// then anything containing "Error:" — and fall back to a wider window when
+// neither is found. Crucially, do NOT just take the last line of stderr:
+// Bun's runtime trailers (`at processTicksAndRejections (native:7:39)`) and
+// stack frames are nearly always the last lines, and they tell the user
+// nothing about what actually failed.
 function extractError(stderr: string, stdout: string): string {
-  const errLines = stderr.split("\n").map((l) => l.trim()).filter(Boolean);
-  const lastErr = errLines[errLines.length - 1];
-  if (lastErr) return lastErr.slice(0, 1000);
-  const tail = stdout.trim().split("\n").slice(-5).join("\n").trim();
-  return tail.slice(0, 1000);
+  const lines = stderr.split("\n").map((l) => l.trim()).filter(Boolean);
+  const isStackFrame = (l: string): boolean =>
+    /^at\s/.test(l) || /\(native:\d+:\d+\)$/.test(l);
+
+  // 1. Highest signal: orchestrator's `[stage] message` line.
+  const stageLine = [...lines].reverse().find((l) => /^\[\w[\w-]*\]/.test(l));
+  if (stageLine) return stageLine.slice(0, 1500);
+
+  // 2. Next: any line containing "Error:" — this captures Node-thrown errors
+  //    (`Error: ENOENT: ...`), TypeErrors, etc. before their stack.
+  const errorLine = lines.find((l) => /Error:/.test(l) && !isStackFrame(l));
+  if (errorLine) return errorLine.slice(0, 1500);
+
+  // 3. Otherwise, the last *non-stack-frame* line.
+  const meaningful = [...lines].reverse().find((l) => !isStackFrame(l));
+  if (meaningful) return meaningful.slice(0, 1500);
+
+  // 4. Fall back to the last 5 lines of stderr (or stdout, then the literal
+  //    tail) so something always lands in the dashboard.
+  const stderrTail = lines.slice(-5).join(" | ");
+  if (stderrTail) return stderrTail.slice(0, 1500);
+  const stdoutTail = stdout.trim().split("\n").slice(-5).join(" | ").trim();
+  return stdoutTail.slice(0, 1500);
 }

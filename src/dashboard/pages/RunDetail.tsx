@@ -33,6 +33,13 @@ function RunDetailInner({ id }: { id: string }) {
     onSuccess: () => { toast({ tone: "ok", msg: "재시도 완료" }); utils.runs.get.invalidate({ id }); },
     onError: (e) => toast({ tone: "err", msg: e.message }),
   });
+  // Re-trigger the topic's pipeline from scratch. Useful when the run failed
+  // mid-pipeline (render error, etc.) — there's no reel-mp4 to publish, so
+  // the publish buttons are blocked, and the only way out is a fresh run.
+  const rerun = trpc.topics.runNow.useMutation({
+    onSuccess: () => { toast({ tone: "ok", msg: "새 실행이 큐에 추가되었습니다 — 토픽 페이지에서 진행 상황 확인" }); },
+    onError: (e) => toast({ tone: "err", msg: `재실행 실패: ${e.message}` }),
+  });
 
   if (detail.isLoading) return <Skeleton rows={4} height="h-32" />;
   if (detail.error) return <ErrorBox error={detail.error} onRetry={() => detail.refetch()} />;
@@ -83,8 +90,21 @@ function RunDetailInner({ id }: { id: string }) {
 
       {run.error ? (
         <div className="card border-red-500/40 bg-red-500/5">
-          <div className="text-red-300 font-medium text-sm">실행 오류</div>
-          <pre className="text-zinc-300 text-xs mt-2 whitespace-pre-wrap break-words">{run.error}</pre>
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <div className="text-red-300 font-medium text-sm">실행 오류</div>
+              <pre className="text-zinc-300 text-xs mt-2 whitespace-pre-wrap break-words">{run.error}</pre>
+            </div>
+            {topic ? (
+              <button
+                className="btn btn-primary shrink-0"
+                disabled={rerun.isPending || runInFlight}
+                onClick={() => rerun.mutate({ id: topic.id })}
+              >
+                {rerun.isPending ? "재실행 큐 추가 중..." : "다시 실행"}
+              </button>
+            ) : null}
+          </div>
         </div>
       ) : null}
 

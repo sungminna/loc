@@ -70,11 +70,31 @@ async function main(args: Args): Promise<void> {
     return { track: t, score: moodMatch * 10 - recencyPenalty + Math.random() };
   }).sort((a, b) => b.score - a.score);
 
-  const pick = scored[0]?.track ?? candidates[Math.floor(Math.random() * candidates.length)];
-  if (!pick) throw new Error("no audio tracks available");
+  // Walk candidates in score order; skip rows whose R2 object is missing.
+  // The audio_tracks catalog can drift from R2 (e.g. seeded placeholder
+  // rows whose mp3 was never uploaded) — Remotion hard-fails the render
+  // if the audioUrl 404s, so verify before committing to a pick.
+  const ordered = scored.map((s) => s.track);
+  const r2Base = process.env.R2_PUBLIC_BASE ?? "";
+  for (const t of ordered) {
+    if (r2Base && !(await r2ObjectExists(`${r2Base}/${t.r2Key}`))) {
+      console.error(`[select-audio] skip ${t.id} (${t.r2Key}): R2 object missing`);
+      continue;
+    }
+    await api.touchAudio(t.id);
+    emit(t);
+    return;
+  }
+  throw new Error("no audio tracks available (all candidates missing in R2)");
+}
 
-  await api.touchAudio(pick.id);
-  emit(pick);
+async function r2ObjectExists(url: string): Promise<boolean> {
+  try {
+    const res = await fetch(url, { method: "HEAD" });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 function emit(t: AudioTrackJson): void {

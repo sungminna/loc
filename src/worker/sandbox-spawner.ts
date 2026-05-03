@@ -100,14 +100,13 @@ export async function spawnSandboxRun(
         `orchestrator exited with code ${result.exitCode}`
       : null;
 
-    // The orchestrator skill is responsible for setting status=done|failed,
-    // but we reconcile here as a safety net.
-    //  - CLI crashed (non-zero exit) → failed
-    //  - CLI exited 0 AND skill called set-status done → trust it
-    //  - CLI exited 0 BUT status is still mid-pipeline → orchestrator
-    //    skipped its own terminal set-status: treat as failed so the
-    //    dashboard surfaces the partial run rather than masking it as
-    //    "done with no brief / no assets".
+    // The orchestrator process owns the terminal status transition (done /
+    // failed), but we reconcile here as a safety net.
+    //  - exit non-zero → failed
+    //  - exit 0 AND status == done → trust it
+    //  - exit 0 BUT status still mid-pipeline → orchestrator skipped its
+    //    own terminal set-status (shouldn't happen in the new design, but
+    //    keep this guard against silent regressions).
     const cur = await db.query.runs.findFirst({ where: eq(runs.id, runId) });
     const IN_FLIGHT: ReadonlySet<RunStatus> = new Set([
       "planned", "researching", "planning", "generating", "rendering", "publishing",
@@ -120,7 +119,7 @@ export async function spawnSandboxRun(
           ? "failed"
           : (cur?.status ?? "failed");
     const reconciledError = !failed && status === "failed"
-      ? `orchestrator exited cleanly but left status=${cur?.status ?? "unknown"} — skill did not call set-status done`
+      ? `orchestrator exited 0 but left status=${cur?.status ?? "unknown"} — never reached done/failed`
       : null;
 
     await db.update(runs).set({

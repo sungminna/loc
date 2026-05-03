@@ -21,7 +21,7 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { spawnSync, type SpawnSyncReturns } from "node:child_process";
-import { api, type AudioTrackJson, type TemplateJson, type TopicJson } from "./lib/api";
+import { api, type TemplateJson, type TopicJson } from "./lib/api";
 
 // ─── Brief shape (mirrors content-plan output) ───────────────────────
 interface Slide {
@@ -129,6 +129,7 @@ function runBash(cmd: string, timeoutMs: number): SpawnSyncReturns<string> {
     encoding: "utf8",
     timeout: timeoutMs,
     env: process.env,
+    cwd: "/workspace",
     maxBuffer: 32 * 1024 * 1024,
   });
 }
@@ -905,6 +906,3 @@ async function main(): Promise<void> {
 main().catch(async (e: unknown) => {
   await fail("uncaught", e);
 });
-
-// Silence unused warnings for fields imported but read only via dynamic access
-void ({} as AudioTrackJson);

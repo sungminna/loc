@@ -64,6 +64,24 @@ export async function spawnSandboxRun(
       throw stage("install", installRes.stderr || installRes.stdout, installRes.exitCode);
     }
 
+    // Wire the prefetched Chromium (baked into /opt/remotion-runtime/node_modules/.remotion
+    // by the Dockerfile) into /workspace/node_modules/.remotion so Remotion's
+    // renderMedia finds it at the path it actually checks. Without this the
+    // freshly-installed @remotion/renderer in /workspace would re-download
+    // ~150 MB of headless-shell from the per-run sandbox network on every
+    // run — which is exactly what was failing before.
+    const linkRes = await sandbox.exec(
+      "mkdir -p /workspace/node_modules && " +
+      "rm -rf /workspace/node_modules/.remotion && " +
+      "ln -sf /opt/remotion-runtime/node_modules/.remotion /workspace/node_modules/.remotion && " +
+      "ls -la /workspace/node_modules/.remotion/chrome-headless-shell/linux64/ | head -3",
+    );
+    if (linkRes.exitCode !== 0) {
+      // Non-fatal — render-reel would re-download Chromium and probably
+      // succeed anyway. Log so we know the prefetch path drifted.
+      console.error(`[run ${runId}] chromium prefetch link failed: ${linkRes.stderr || linkRes.stdout}`);
+    }
+
     // ── Run Claude Code headlessly ────────────────────────────────────
     const childEnv: Record<string, string> = {
       // Tells the CLI we're already in a sandbox; bypasses the

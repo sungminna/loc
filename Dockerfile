@@ -22,5 +22,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && ln -sf /root/.bun/bin/bun /usr/local/bin/bun \
   && npm install -g @anthropic-ai/claude-code
 
+# Pre-bake Remotion's bundled Chromium into /root/.cache/remotion/. Without
+# this, the first selectComposition/renderMedia call in each run triggers a
+# ~150 MB Chromium auto-download from inside the per-run sandbox container.
+# That download has been observed to fail silently in the sandbox network,
+# leaving render-reel.ts to throw with a stack like `at
+# processTicksAndRejections (native:7:39)` and no actionable message —
+# which is exactly the failure pattern we hit. By prefetching at image-
+# build time the cache lives in the image layer and is available from the
+# moment a fresh container boots, every run.
+RUN mkdir -p /tmp/remotion-prefetch \
+  && cd /tmp/remotion-prefetch \
+  && npm init -y >/dev/null \
+  && npm install --no-save @remotion/renderer@4 \
+  && node -e "require('@remotion/renderer').ensureBrowser().then(() => console.log('remotion chromium prefetched')).catch(e => { console.error('ensureBrowser failed:', e); process.exit(1); })" \
+  && cd / && rm -rf /tmp/remotion-prefetch \
+  && test -d /root/.cache/remotion
+
 # The base image already declares the workdir, server CMD, and EXPOSE 3000.
 # Do NOT override CMD — the sandbox server must remain the entrypoint.

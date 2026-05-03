@@ -42,10 +42,28 @@ async function main(args: Args): Promise<void> {
   const templateMood = tpl.template?.defaultAudioMood ?? [];
 
   const enabled = tracks.filter((t) => t.enabled);
+  const r2Base = process.env.R2_PUBLIC_BASE ?? "";
+
+  // The audio_tracks catalog can drift from R2 (e.g. seeded placeholder rows
+  // whose mp3 was never uploaded). Remotion hard-fails the render if the
+  // audioUrl 404s, so any candidate — fixed or scored — must be HEAD-checked
+  // before we commit to it.
+  const isReachable = async (t: AudioTrackJson): Promise<boolean> => {
+    if (!r2Base) return true;
+    const ok = await r2ObjectExists(`${r2Base}/${t.r2Key}`);
+    if (!ok) console.error(`[select-audio] skip ${t.id} (${t.r2Key}): R2 object missing`);
+    return ok;
+  };
 
   if (audioPrefs.fixedTrackId) {
     const t = enabled.find((x) => x.id === audioPrefs.fixedTrackId);
-    if (t) return emit(t);
+    if (t && (await isReachable(t))) {
+      await api.touchAudio(t.id);
+      emit(t);
+      return;
+    }
+    // Fixed track is gone or never uploaded — fall through to scored picks
+    // rather than failing the run.
   }
 
   const allowed = audioPrefs.allowedSources && audioPrefs.allowedSources.length > 0
@@ -70,19 +88,10 @@ async function main(args: Args): Promise<void> {
     return { track: t, score: moodMatch * 10 - recencyPenalty + Math.random() };
   }).sort((a, b) => b.score - a.score);
 
-  // Walk candidates in score order; skip rows whose R2 object is missing.
-  // The audio_tracks catalog can drift from R2 (e.g. seeded placeholder
-  // rows whose mp3 was never uploaded) — Remotion hard-fails the render
-  // if the audioUrl 404s, so verify before committing to a pick.
-  const ordered = scored.map((s) => s.track);
-  const r2Base = process.env.R2_PUBLIC_BASE ?? "";
-  for (const t of ordered) {
-    if (r2Base && !(await r2ObjectExists(`${r2Base}/${t.r2Key}`))) {
-      console.error(`[select-audio] skip ${t.id} (${t.r2Key}): R2 object missing`);
-      continue;
-    }
-    await api.touchAudio(t.id);
-    emit(t);
+  for (const { track } of scored) {
+    if (!(await isReachable(track))) continue;
+    await api.touchAudio(track.id);
+    emit(track);
     return;
   }
   throw new Error("no audio tracks available (all candidates missing in R2)");

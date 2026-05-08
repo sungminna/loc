@@ -366,8 +366,8 @@ function StoryboardTab({
   const toast = useToast();
   const templates = trpc.templates.list.useQuery();
   const selectedTemplate = (templates.data ?? []).find((t) => t.slug === topic.templateSlugs[0]);
-  const compositionId = selectedTemplate?.compositionId ?? "CardNews";
-  const templateAccent = selectedTemplate?.accentColor ?? "#facc15";
+  const compositionId = selectedTemplate?.compositionId ?? "Editorial";
+  const templateAccent = selectedTemplate?.accentColor ?? "#a8201a";
   const isVideoReel = compositionId === "SeedanceReel" || selectedTemplate?.kind === "reel-video";
 
   const saveDraft = trpc.topics.saveDraft.useMutation({
@@ -497,7 +497,7 @@ function StoryboardTab({
         videoUrl: s.videoR2Key ? `${publicMediaBase}/${s.videoR2Key}` : undefined,
       }));
       return {
-        brand: { handle: "@yourhandle", name: "Loc" },
+        brand: { handle: "", name: "" },
         lang: topic.lang === "en" ? "en" : "ko",
         accent: draft.video?.accent ?? templateAccent,
         scenes: scenes.length ? scenes : undefined,
@@ -513,7 +513,7 @@ function StoryboardTab({
       bgImageUrl: s.bgImageUrl ?? (s.bgImageR2Key ? `${publicMediaBase}/${s.bgImageR2Key}` : undefined),
     }));
     return {
-      brand: { handle: "@yourhandle", name: "Loc" },
+      brand: { handle: "", name: "" },
       lang: topic.lang === "en" ? "en" : "ko",
       accent: templateAccent,
       slides: slides.length ? slides : undefined,
@@ -722,7 +722,7 @@ function SlideEditor({
   // inputProps shadow so the slide gets index 0/1 and reads as the only
   // visible card — clean preview without the surrounding slides bleeding in.
   const oneSlideProps = useMemo<Record<string, unknown>>(() => ({
-    brand: { handle: "@yourhandle", name: "Loc" },
+    brand: { handle: "", name: "" },
     lang,
     accent,
     slides: [{
@@ -795,7 +795,7 @@ function SlideEditor({
         </Field>
 
         <details className="border-t border-zinc-800 pt-2">
-          <summary className="text-xs text-zinc-400 cursor-pointer">통계 / 인용 (DataStory · NeoBrutalism · QuoteSpotlight)</summary>
+          <summary className="text-xs text-zinc-400 cursor-pointer">통계 / 인용 (Monocle · Riso · Index032c · Cover)</summary>
           <div className="grid grid-cols-3 gap-2 mt-2">
             <Field label="stat 값">
               <input className="input text-sm" value={slide.stat?.value ?? ""}
@@ -812,7 +812,7 @@ function SlideEditor({
                 onChange={(e) => onChange({ stat: { ...(slide.stat ?? {}), label: e.target.value } })} />
             </Field>
           </div>
-          <Field label="quote 출처 (QuoteSpotlight 전용)">
+          <Field label="quote 출처 (Cover 전용)">
             <input className="input text-sm" value={slide.attribution ?? ""}
               onChange={(e) => onChange({ attribution: e.target.value })}
               placeholder="— 어떤 작가" />
@@ -913,7 +913,7 @@ function SceneEditor({
   onRemove: () => void;
 }) {
   const previewProps = useMemo<Record<string, unknown>>(() => ({
-    brand: { handle: "@yourhandle", name: "Loc" },
+    brand: { handle: "", name: "" },
     lang: "ko",
     accent,
     scenes: [{

@@ -1,22 +1,17 @@
 // Compose-time registry that lets the dashboard render any of our Remotion
 // compositions inside <Player>. The components themselves are pure React +
-// Remotion APIs (useCurrentFrame, Sequence, AbsoluteFill, OffthreadVideo,
-// etc.) — all of which run in the browser inside @remotion/player.
+// Remotion APIs — all of which run in the browser inside @remotion/player.
 //
 // We don't import Root.tsx (which calls registerRoot, a no-op outside
 // Remotion's renderer but adds dead weight to the dashboard bundle).
 
 import type { ComponentType } from "react";
-import { CardNews, defaultCardNewsProps, type CardNewsProps } from "@/remotion/compositions/CardNews";
+import { Editorial, defaultEditorialProps } from "@/remotion/compositions/Editorial";
+import { Monocle, defaultMonocleProps } from "@/remotion/compositions/Monocle";
+import { Riso, defaultRisoProps } from "@/remotion/compositions/Riso";
+import { Cover, defaultCoverProps } from "@/remotion/compositions/Cover";
+import { Index032c, defaultIndex032cProps } from "@/remotion/compositions/Index032c";
 import { ThreadsCard, defaultThreadsCardProps, type ThreadsCardProps } from "@/remotion/compositions/ThreadsCard";
-import { KineticType, defaultKineticTypeProps } from "@/remotion/compositions/KineticType";
-import { BoldEditorial, defaultBoldEditorialProps } from "@/remotion/compositions/BoldEditorial";
-import { MinimalGrid, defaultMinimalGridProps } from "@/remotion/compositions/MinimalGrid";
-import { NeoBrutalism, defaultNeoBrutalismProps } from "@/remotion/compositions/NeoBrutalism";
-import { GlassMorphism, defaultGlassMorphismProps } from "@/remotion/compositions/GlassMorphism";
-import { RetroVHS, defaultRetroVHSProps } from "@/remotion/compositions/RetroVHS";
-import { DataStory, defaultDataStoryProps } from "@/remotion/compositions/DataStory";
-import { QuoteSpotlight, defaultQuoteSpotlightProps } from "@/remotion/compositions/QuoteSpotlight";
 import { SeedanceReel, defaultSeedanceReelProps } from "@/remotion/compositions/SeedanceReel";
 import type { CardSlideProps, VideoReelProps } from "@/remotion/types";
 
@@ -26,15 +21,11 @@ type AnyComp = ComponentType<Record<string, unknown>>;
 
 // Match Root.tsx — keep these in sync if you tune frames-per-slide there.
 const SLIDE_FRAMES_BY_COMP: Record<string, number> = {
-  CardNews: 90,
-  KineticType: 96,
-  BoldEditorial: 102,
-  MinimalGrid: 90,
-  NeoBrutalism: 96,
-  GlassMorphism: 96,
-  RetroVHS: 96,
-  DataStory: 102,
-  QuoteSpotlight: 108,
+  Editorial: 156,
+  Monocle: 162,
+  Riso: 156,
+  Cover: 168,
+  Index032c: 150,
 };
 
 const FPS = 30;
@@ -56,7 +47,7 @@ export interface RegistryEntry {
 
 const cardDuration = (compId: string) => (props: Record<string, unknown>) => {
   const slides = (props as unknown as CardSlideProps).slides ?? [];
-  const slideFrames = SLIDE_FRAMES_BY_COMP[compId] ?? 90;
+  const slideFrames = SLIDE_FRAMES_BY_COMP[compId] ?? 150;
   return Math.max(FPS * 6, slideFrames * Math.max(1, slides.length) + 12);
 };
 
@@ -67,77 +58,45 @@ const videoDuration = (props: Record<string, unknown>) => {
 };
 
 export const compositionRegistry: Record<string, RegistryEntry> = {
-  CardNews: {
-    Component: CardNews as unknown as AnyComp,
-    defaults: defaultCardNewsProps as unknown as Record<string, unknown>,
+  Editorial: {
+    Component: Editorial as unknown as AnyComp,
+    defaults: defaultEditorialProps as unknown as Record<string, unknown>,
     width: 1080, height: 1920, fps: FPS,
-    durationFromProps: cardDuration("CardNews"),
+    durationFromProps: cardDuration("Editorial"),
     briefShape: "card",
-    label: "Card News (default)",
+    label: "Editorial — NYT Magazine",
   },
-  KineticType: {
-    Component: KineticType as unknown as AnyComp,
-    defaults: defaultKineticTypeProps as unknown as Record<string, unknown>,
+  Monocle: {
+    Component: Monocle as unknown as AnyComp,
+    defaults: defaultMonocleProps as unknown as Record<string, unknown>,
     width: 1080, height: 1920, fps: FPS,
-    durationFromProps: cardDuration("KineticType"),
+    durationFromProps: cardDuration("Monocle"),
     briefShape: "card",
-    label: "Kinetic Type",
+    label: "Monocle — Briefing",
   },
-  BoldEditorial: {
-    Component: BoldEditorial as unknown as AnyComp,
-    defaults: defaultBoldEditorialProps as unknown as Record<string, unknown>,
+  Riso: {
+    Component: Riso as unknown as AnyComp,
+    defaults: defaultRisoProps as unknown as Record<string, unknown>,
     width: 1080, height: 1920, fps: FPS,
-    durationFromProps: cardDuration("BoldEditorial"),
+    durationFromProps: cardDuration("Riso"),
     briefShape: "card",
-    label: "Bold Editorial",
+    label: "Riso — Hot Poster",
   },
-  MinimalGrid: {
-    Component: MinimalGrid as unknown as AnyComp,
-    defaults: defaultMinimalGridProps as unknown as Record<string, unknown>,
+  Cover: {
+    Component: Cover as unknown as AnyComp,
+    defaults: defaultCoverProps as unknown as Record<string, unknown>,
     width: 1080, height: 1920, fps: FPS,
-    durationFromProps: cardDuration("MinimalGrid"),
+    durationFromProps: cardDuration("Cover"),
     briefShape: "card",
-    label: "Minimal Grid",
+    label: "Cover — Vogue/Numéro",
   },
-  NeoBrutalism: {
-    Component: NeoBrutalism as unknown as AnyComp,
-    defaults: defaultNeoBrutalismProps as unknown as Record<string, unknown>,
+  Index032c: {
+    Component: Index032c as unknown as AnyComp,
+    defaults: defaultIndex032cProps as unknown as Record<string, unknown>,
     width: 1080, height: 1920, fps: FPS,
-    durationFromProps: cardDuration("NeoBrutalism"),
+    durationFromProps: cardDuration("Index032c"),
     briefShape: "card",
-    label: "Neo Brutalism",
-  },
-  GlassMorphism: {
-    Component: GlassMorphism as unknown as AnyComp,
-    defaults: defaultGlassMorphismProps as unknown as Record<string, unknown>,
-    width: 1080, height: 1920, fps: FPS,
-    durationFromProps: cardDuration("GlassMorphism"),
-    briefShape: "card",
-    label: "Glass Morphism",
-  },
-  RetroVHS: {
-    Component: RetroVHS as unknown as AnyComp,
-    defaults: defaultRetroVHSProps as unknown as Record<string, unknown>,
-    width: 1080, height: 1920, fps: FPS,
-    durationFromProps: cardDuration("RetroVHS"),
-    briefShape: "card",
-    label: "Retro VHS",
-  },
-  DataStory: {
-    Component: DataStory as unknown as AnyComp,
-    defaults: defaultDataStoryProps as unknown as Record<string, unknown>,
-    width: 1080, height: 1920, fps: FPS,
-    durationFromProps: cardDuration("DataStory"),
-    briefShape: "card",
-    label: "Data Story",
-  },
-  QuoteSpotlight: {
-    Component: QuoteSpotlight as unknown as AnyComp,
-    defaults: defaultQuoteSpotlightProps as unknown as Record<string, unknown>,
-    width: 1080, height: 1920, fps: FPS,
-    durationFromProps: cardDuration("QuoteSpotlight"),
-    briefShape: "card",
-    label: "Quote Spotlight",
+    label: "Index — Wallpaper*/032c",
   },
   SeedanceReel: {
     Component: SeedanceReel as unknown as AnyComp,
@@ -162,5 +121,4 @@ export function getComposition(id: string): RegistryEntry | null {
 }
 
 // Silence unused-type warnings (props inferred via casts above).
-void ({} as CardNewsProps);
 void ({} as ThreadsCardProps);

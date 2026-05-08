@@ -150,6 +150,18 @@ These words push gpt-image-2 into synthetic concept-art mode. Strip them:
 
 See `.claude/skills/image-gen/SKILL.md` for the full vocabulary cheatsheet and 4 worked examples (AI-tools, finance, trends, Threads card).
 
+#### Match the prompt to the template's photographic register
+
+Each of the 5 curated templates is anchored to a real publication. Read `template.json.bgPromptTemplate` first — it tells you which photographic register the deck is committed to — and write a content prompt that *agrees* with it, not one that fights it. A finance brief on the Cover template should not request a Bloomberg trader desk; it should request a single ceramic vessel on raw linen with one warm-metal note. Conversely, a finance brief on Monocle should request a Yeouido lobby at low elevation, not a serene domestic still life. The orchestrator concatenates `topic.imageStylePrompt + template.bgPromptTemplate + your bgImagePrompt`, so a register conflict shows up as a generic AI-stock image.
+
+| compositionId | Best subject family |
+|---|---|
+| `Editorial` | NYT Magazine — domestic, hand-related still life, real-place reportage |
+| `Monocle` | Monocle/Bloomberg — desks, lobbies, ledgers, low-elevation cityscape |
+| `Riso` | RISOTTO Studio — single object dead-center on hot-red seamless |
+| `Cover` | Vogue/Numéro — single subject at shoulder line, charcoal surrounds |
+| `Index032c` | Wallpaper*/032c — industrial-design product on matte-black cyc |
+
 ### slides[0].bgImagePrompt — the cover frame (treat it specially)
 
 In `ai-first-only` mode (the default for new topics) **only slide 0's `bgImagePrompt` is rendered through gpt-image-2** — slides 1..N use the template's gradient. So slide 0 carries the entire visual identity of the run. Don't write it like any other slide bg; write it like a magazine cover:

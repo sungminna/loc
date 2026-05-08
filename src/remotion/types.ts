@@ -8,9 +8,9 @@ export interface ReelSlide {
   headline: string;
   body?: string;
   emphasis?: string;
-  /** Single number or short stat highlighted in DataStory / NeoBrutalism. */
+  /** Single number or short stat highlighted by Monocle / Riso / Index032c. */
   stat?: { value: string; label?: string; suffix?: string };
-  /** Quote attribution for QuoteSpotlight. */
+  /** Quote attribution for Cover. */
   attribution?: string;
   /** Background image URL — typically gpt-image-2 output uploaded to R2. */
   bgImageUrl?: string;

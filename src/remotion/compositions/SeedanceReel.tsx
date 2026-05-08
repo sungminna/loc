@@ -27,7 +27,7 @@ const FPS = 30;
 const FALLBACK_SCENE_FRAMES = 5 * FPS;
 
 export const defaultSeedanceReelProps: VideoReelProps = {
-  brand: { handle: "@yourhandle", name: "Loc" },
+  brand: { handle: "", name: "" },
   lang: "ko",
   scenes: [
     {
@@ -64,7 +64,7 @@ export const defaultSeedanceReelProps: VideoReelProps = {
   ],
 };
 
-export const SeedanceReel: React.FC<VideoReelProps> = ({ brand, lang, scenes, audioUrl, attribution, accent }) => {
+export const SeedanceReel: React.FC<VideoReelProps> = ({ lang, scenes, audioUrl, attribution, accent }) => {
   const { fps } = useVideoConfig();
   const fontFamily = lang === "ko" ? theme.fontFamilyKo : theme.fontFamilyEn;
   const list = scenes.length ? scenes : defaultSeedanceReelProps.scenes;
@@ -92,7 +92,6 @@ export const SeedanceReel: React.FC<VideoReelProps> = ({ brand, lang, scenes, au
       })}
 
       <ProgressBar offsets={cumOffsets} accent={accentColor} />
-      <BrandWatermark brand={brand} accent={accentColor} />
       {attribution ? <Attribution text={attribution} /> : null}
     </AbsoluteFill>
   );
@@ -276,19 +275,6 @@ const ProgressBar: React.FC<{ offsets: number[]; accent: string }> = ({ offsets,
     </div>
   );
 };
-
-const BrandWatermark: React.FC<{ brand: { handle: string; name: string }; accent: string }> = ({ brand, accent }) => (
-  <div style={{
-    position: "absolute", bottom: 140, left: 0, right: 0,
-    display: "flex", justifyContent: "center", alignItems: "center", gap: 16,
-    fontSize: 22, color: "rgba(255,255,255,0.85)", letterSpacing: 4,
-    textShadow: "0 2px 10px rgba(0,0,0,0.6)",
-  }}>
-    <span style={{ width: 6, height: 6, background: accent, borderRadius: 3 }} />
-    <span style={{ fontWeight: 800, color: "#fff" }}>{brand.name.toUpperCase()}</span>
-    <span style={{ opacity: 0.7 }}>{brand.handle}</span>
-  </div>
-);
 
 const Attribution: React.FC<{ text: string }> = ({ text }) => (
   <div style={{

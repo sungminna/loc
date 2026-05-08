@@ -91,26 +91,48 @@ These words push the model into synthetic / concept-art mode. Strip them before 
 - ❌ Style soup: `minimalist brutalist editorial luxury photoreal cinematic` (pick ONE register and commit)
 - ❌ Emotion abstractions: `evoking trust`, `feeling of innovation`, `sense of empowerment` (replace with what's in the frame)
 
-## Worked examples (copy these patterns)
+## Match the prompt to the chosen template
 
-### Slide-0 cover for an AI-tools topic
+Each of the curated 5 templates has its own photographic register encoded in the `template.bgPromptTemplate` (concatenated automatically by the orchestrator). Your `bgImagePrompt` should *agree* with that register, not fight it. If the template is **Cover** (Vogue/W) and you write a prompt that asks for a Bloomberg-style trader desk, gpt-image-2 receives mixed signals and produces a generic AI-stock image. Read `template.json.bgPromptTemplate` first, then write a content prompt that honors it.
+
+| compositionId | Reference publication | Photographic register |
+|---|---|---|
+| `Editorial` | NYT Magazine, The New Yorker, Cereal | 35mm documentary, single window light, real surface texture, paper-cream non-image areas, one quiet brick accent. Subject in right two-thirds, left column empty for type. |
+| `Monocle` | Monocle, Bloomberg Businessweek, FT Weekend | Low-key environmental still life, single overcast/fluorescent, low contrast, navy + cream + one coral note. Subject central, upper third plain. |
+| `Riso` | RISOTTO Studio, Print magazine | Single subject flat on hot-red seamless paper, hard side light, faint cyan-magenta misregistration. 032c red carrying the page. |
+| `Cover` | Vogue, W, Numéro | Full-bleed editorial portrait or still life, charcoal/neutral surroundings, single softbox/window light, one warm-metal accent. Subject in central upper half. |
+| `Index032c` | Wallpaper*, 032c, Index magazine | Industrial-design product shot or environmental architecture, single subject on infinite cyc or matte-black wall, hard side light, deep blacks dominating, one chartreuse note. |
+
+## Worked examples (copy and adapt these — one per template)
+
+### Editorial — NYT Magazine register, slide 0 for an opinion topic
 ```
-A solo developer at a kitchen table at 1am, hunched over a 13-inch laptop, half-eaten ramen cup pushed to the edge of the desk, three dim Slack notifications glowing on the screen. Single warm desk lamp and the laptop's cold backlight crossing on the face. 35mm film grain, shallow depth of field, the keyboard out of focus. Subject sits to the right; the upper-left third is dark wall. Muted earth tones, one pale-amber accent from the lamp.
+A worn wooden floor at the corner of a Yeouido apartment, a paperback cracked open spine-up beside a half-empty cream-colored mug, the steam catching the morning light. Subject sits in the right two-thirds of the frame; the upper-left is a plain warm-cream wall with no objects on it. 35mm film grain, shallow depth of field, single north-facing window light, dust motes visible. Real paper-edge texture, condensation on the mug, slight skin tone in a hand barely entering the frame from the right. Muted earth tones, one quiet brick accent from a folded scarf at the edge of the floor.
 ```
 
-### Slide-0 cover for a finance topic
+### Monocle — Briefing register, slide 0 for a finance topic
 ```
-A trader's desk just after market close — three monitors dimmed, a coffee cup with a faint lipstick mark, a paper printout with red-inked annotations and one circled number. Window blinds cast late-afternoon striped shadows across the keyboard. Documentary 50mm, shallow depth of field, no person visible, just the aftermath. Negative space along the upper third where the morning light hits the wall. Cool blue tonality with a single warm tungsten desk lamp as accent.
+A Yeouido high-rise lobby photographed at low elevation early morning, the security desk's stainless rim catching one warm tungsten lamp, the rest of the lobby in cool overcast tone from the floor-to-ceiling glass. A single printed Bloomberg Terminal page lies on the marble, three numbers circled in red pen. Documentary 50mm, no person in frame, the upper third of the photograph is plain dark glass with a faint city haze behind. Cool navy and paper-cream palette, one coral-red note from the pen circles only.
 ```
 
-### Slide-0 cover for a trends / culture topic
+### Riso — Hot Poster register, slide 0 for a trend / hot-take topic
 ```
-A small hand-painted sign in a Seoul side-alley reading "오늘 마감", taped to a glass door at dusk, the neon sign of a 24-hour convenience store reflected in the glass. A cyclist out of focus passing in the background, motion blur on the wheel. 35mm film, soft drizzle on the asphalt, mixed neon and sodium-vapor light. Subject lower-third, upper two-thirds is wet sky and reflection.
+A single ripe persimmon balanced on top of a 1990s rotary telephone, photographed dead-center on a flat hot-red seamless paper backdrop. Hard key light from camera-left producing a sharp short shadow on the right. Color separation pushed slightly so faint cyan dot misregistration is visible on the persimmon's midtones (offset-print artifact). Waxy fruit skin, scuffed bakelite phone, dust on the cord. Upper 25% of the frame is plain hot-red seamless with no objects, ready for a headline. Pantone-032c red and paper-cream margin only.
+```
+
+### Cover — Vogue/Numéro register, slide 0 for a quote / lifestyle topic
+```
+A wool coat draped over a vintage chair photographed at the shoulder line, charcoal wallpaper behind, one single softbox window light from camera-right falling across the lapel and dying into shadow on the left. The coat's wool weave is visible up close, a brass button catches a single warm-metal highlight. No face, no logo. Composition is full-bleed; the subject occupies the central upper two-thirds of the frame, leaving the lower third in plain shadow for typography. Cool charcoal palette, one burnished-gold note on the button only.
+```
+
+### Index — Wallpaper*/032c register, slide 0 for an AI / tech topic
+```
+A single Korean mechanical keyboard with hangul-engraved keycaps photographed dead-center on an infinite matte-black cyc, one hard key light from camera-right producing a clean short shadow on the cyc. The keyboard's stainless top plate catches the light; the keycaps are slightly worn at the most-pressed letters. Negative space dominates: roughly 60% of the frame is empty matte black around the subject. One acid chartreuse note appears on a single packaging sticker on the side of the keyboard, no other color. No glamour, no glow, no studio polish.
 ```
 
 ### Threads card (vertical 2:3, single subject)
 ```
-A pair of weathered hands holding an open paperback, the page-edge yellowed, a thumbprint smudge near the spine. Window light from the left, the rest of the room dropping into shadow. 50mm portrait lens, shallow depth of field, subtle film grain. The book takes the lower half; the upper half is a muted off-white wall. No face, no text on the page (page is intentionally blurred).
+A pair of weathered hands wrapping a paper bag at a Mangwon-dong bakery counter at 8am, the brown paper edge curled and slightly scuffed, a single coffee ring on the wooden counter. Window light from the left falls across the hands, the rest of the room drops into shadow. 50mm portrait lens, shallow depth of field, subtle film grain, dust on the wood. The hands and bag take the lower half; the upper half is a plain warm-cream wall ready for headline overlay. No face, no text in the image.
 ```
 
 ## Editing existing images

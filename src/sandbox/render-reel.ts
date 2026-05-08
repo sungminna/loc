@@ -3,7 +3,7 @@
 // CLI:
 //   bun src/sandbox/render-reel.ts \
 //     --run-id <runId> \
-//     --composition CardNews \
+//     --composition Editorial \
 //     --brief data/runs/<runId>/brief.json \
 //     [--audio-url <publicUrl>] \
 //     [--audio-attribution "..."] \
@@ -39,7 +39,7 @@ function parseArgs(argv: string[]): Args {
   const accentRaw = m.get("accent")?.trim();
   return {
     runId,
-    composition: m.get("composition") ?? "CardNews",
+    composition: m.get("composition") ?? "Editorial",
     briefPath: m.get("brief") ?? `data/runs/${runId}/brief.json`,
     audioUrl: m.get("audio-url"),
     audioAttribution: m.get("audio-attribution"),

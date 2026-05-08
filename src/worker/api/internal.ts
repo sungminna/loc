@@ -2,6 +2,13 @@
 // Auth: Bearer INTERNAL_API_KEY + LOC-Run-Id header.
 // All mutations are scoped to the run/user identified by the headers — even
 // with a stolen INTERNAL_API_KEY, a sandbox can only touch its own run.
+//
+// Wire format conventions:
+// - Timestamps cross the JSON boundary as epoch ms (number) or null. Drizzle
+//   `timestamp_ms` columns require Date objects on `.set()` — every handler
+//   that accepts a timestamp from the body MUST normalize via `toDate()`.
+// - Mutation handlers pick allowed fields explicitly (no `...body` spread)
+//   so adding a new column to the schema cannot silently widen the wire.
 
 import { eq, and } from "drizzle-orm";
 import { getDb } from "@db/client";
@@ -69,9 +76,23 @@ export async function handleInternal(req: Request, env: Env, path: string): Prom
   }
 
   if (req.method === "POST" && path === "/internal/asset") {
-    const body = (await req.json()) as typeof assets.$inferInsert;
+    const body = (await req.json()) as {
+      runId: string;
+      kind: typeof assets.$inferInsert.kind;
+      r2Key: string;
+      mime: string;
+      bytes: number;
+      meta?: Record<string, unknown>;
+    };
     if (body.runId !== ident.runId) return forbidden();
-    const [row] = await db.insert(assets).values(body).returning();
+    const [row] = await db.insert(assets).values({
+      runId: body.runId,
+      kind: body.kind,
+      r2Key: body.r2Key,
+      mime: body.mime,
+      bytes: body.bytes,
+      meta: body.meta,
+    }).returning();
     return json({ asset: row });
   }
 
@@ -92,25 +113,73 @@ export async function handleInternal(req: Request, env: Env, path: string): Prom
   }
 
   if (req.method === "POST" && path === "/internal/post") {
-    const body = (await req.json()) as Omit<typeof posts.$inferInsert, "userId"> & { runId: string };
+    const body = (await req.json()) as {
+      runId: string;
+      accountId: string;
+      templateSlug?: string;
+      platform: "instagram" | "threads";
+      mediaType: "reel" | "photo" | "carousel" | "text";
+      caption: string;
+      lang: "ko" | "en";
+      assetKeys: string[];
+      audioTrackId?: string;
+    };
     if (body.runId !== ident.runId) return forbidden();
-    const [row] = await db.insert(posts).values({ ...body, userId: ident.userId }).returning();
+    const [row] = await db.insert(posts).values({
+      runId: body.runId,
+      userId: ident.userId,
+      accountId: body.accountId,
+      templateSlug: body.templateSlug,
+      platform: body.platform,
+      mediaType: body.mediaType,
+      caption: body.caption,
+      lang: body.lang,
+      assetKeys: body.assetKeys,
+      audioTrackId: body.audioTrackId,
+    }).returning();
     return json({ post: row });
   }
 
   if (req.method === "POST" && path === "/internal/post/update") {
-    const body = (await req.json()) as Partial<typeof posts.$inferInsert> & { id: string };
+    // Allowlisted mutable fields only — never spread the body. Timestamps
+    // arrive as epoch ms; convert to Date at the boundary.
+    const body = (await req.json()) as {
+      id: string;
+      remoteId?: string;
+      permalink?: string;
+      status?: "pending" | "published" | "failed";
+      errorMessage?: string;
+      publishedAt?: number | null;
+    };
     const owned = await db.query.posts.findFirst({ where: eq(posts.id, body.id) });
     if (!owned || owned.runId !== ident.runId) return forbidden();
-    const { id, ...rest } = body;
-    await db.update(posts).set({ ...rest, updatedAt: new Date() }).where(eq(posts.id, id));
+    const update: Partial<typeof posts.$inferInsert> = { updatedAt: new Date() };
+    if (body.remoteId !== undefined) update.remoteId = body.remoteId;
+    if (body.permalink !== undefined) update.permalink = body.permalink;
+    if (body.status !== undefined) update.status = body.status;
+    if (body.errorMessage !== undefined) update.errorMessage = body.errorMessage;
+    if (body.publishedAt !== undefined) update.publishedAt = toDate(body.publishedAt);
+    await db.update(posts).set(update).where(eq(posts.id, body.id));
     return json({ ok: true });
   }
 
   if (req.method === "POST" && path === "/internal/research-note") {
-    const body = (await req.json()) as typeof researchNotes.$inferInsert;
+    const body = (await req.json()) as {
+      topicId: string;
+      sourceUrl: string;
+      title?: string;
+      summary?: string;
+      rawText?: string;
+    };
     if (body.topicId !== ident.topicId) return forbidden();
-    const [row] = await db.insert(researchNotes).values({ ...body, runId: ident.runId }).returning();
+    const [row] = await db.insert(researchNotes).values({
+      topicId: body.topicId,
+      runId: ident.runId,
+      sourceUrl: body.sourceUrl,
+      title: body.title,
+      summary: body.summary,
+      rawText: body.rawText,
+    }).returning();
     return json({ note: row });
   }
 
@@ -186,4 +255,10 @@ function json(body: unknown, status = 200): Response {
 }
 function forbidden(): Response {
   return json({ error: "forbidden: run scope mismatch" }, 403);
+}
+// Normalize wire-format epoch ms (or null) to Drizzle's expected Date|null.
+function toDate(v: number | null | undefined): Date | null | undefined {
+  if (v === undefined) return undefined;
+  if (v === null) return null;
+  return new Date(v);
 }

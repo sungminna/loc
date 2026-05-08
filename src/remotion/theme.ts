@@ -1,8 +1,15 @@
+// IMPORTANT: importing this file triggers the font loaders in fonts.ts
+// (the bare import below). Per-template font specs live in fonts.ts as
+// FONT.<compositionId>; the strings here are sensible fallbacks for the
+// SeedanceReel video overlay and any caller that hasn't been migrated
+// to the per-template system yet.
+import "./fonts";
+
 export const theme = {
-  fontFamilyKo: "'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif",
-  fontFamilyEn: "'Inter', 'Helvetica Neue', sans-serif",
-  fontFamilySerif: "'Playfair Display', 'Noto Serif KR', 'Apple SD Gothic Neo', serif",
-  fontFamilyMono: "'JetBrains Mono', 'IBM Plex Mono', monospace",
+  fontFamilyKo: "'Noto Sans KR', 'Inter', sans-serif",
+  fontFamilyEn: "'Inter', system-ui, sans-serif",
+  fontFamilySerif: "'Fraunces', 'Nanum Myeongjo', 'Noto Serif KR', serif",
+  fontFamilyMono: "'JetBrains Mono', monospace",
   bgGradient: "linear-gradient(135deg, #0a0118 0%, #1a0030 50%, #00121f 100%)",
   accent: "#ffe45c",
   accentAlt: "#ff5c93",

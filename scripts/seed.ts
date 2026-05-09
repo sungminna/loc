@@ -180,12 +180,31 @@ function templateInsert(
   bgPromptTemplate: string,
 ) {
   const platform = kind === "threads-photo" ? "threads" : "instagram";
+  // ON CONFLICT(id) DO UPDATE — re-seeding must overwrite existing rows.
+  // The prior INSERT OR IGNORE form silently skipped collisions, which
+  // meant a re-seed after renaming a slug or repointing a composition
+  // left the old row in place. The May 2026 redesign hit this exact
+  // bug on `ko-ai-kinetic`: a legacy disabled row blocked the new
+  // Kinetic entry. Updated_at = excluded.updated_at so timestamps reflect
+  // the latest seed pass.
   return {
-    sql: `INSERT OR IGNORE INTO templates
+    sql: `INSERT INTO templates
       (id, user_id, slug, name, kind, platform, composition_id, schema, defaults, default_audio_mood,
        duration_sec, version, enabled, accent_color, bg_prompt_template, transition_preset,
        bg_mode, default_bg_r2_key, created_at, updated_at)
-      VALUES (?, NULL, ?, ?, ?, ?, ?, '{}', '{}', ?, ?, 1, 1, ?, ?, 'fade', 'ai', '', ?, ?)`,
+      VALUES (?, NULL, ?, ?, ?, ?, ?, '{}', '{}', ?, ?, 1, 1, ?, ?, 'fade', 'ai', '', ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        slug=excluded.slug,
+        name=excluded.name,
+        kind=excluded.kind,
+        platform=excluded.platform,
+        composition_id=excluded.composition_id,
+        default_audio_mood=excluded.default_audio_mood,
+        duration_sec=excluded.duration_sec,
+        enabled=1,
+        accent_color=excluded.accent_color,
+        bg_prompt_template=excluded.bg_prompt_template,
+        updated_at=excluded.updated_at`,
     params: [id, slug, name, kind, platform, compositionId, defaultAudioMood, durationSec, accentColor, bgPromptTemplate, now, now],
   };
 }

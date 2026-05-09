@@ -93,41 +93,43 @@ These words push the model into synthetic / concept-art mode. Strip them before 
 
 ## Match the prompt to the chosen template
 
-Each of the curated 5 templates has its own photographic register encoded in the `template.bgPromptTemplate` (concatenated automatically by the orchestrator). Your `bgImagePrompt` should *agree* with that register, not fight it. If the template is **Cover** (Vogue/W) and you write a prompt that asks for a Bloomberg-style trader desk, gpt-image-2 receives mixed signals and produces a generic AI-stock image. Read `template.json.bgPromptTemplate` first, then write a content prompt that honors it.
+Each of the curated 5 templates (May 2026 redesign) has its own photographic register encoded in the `template.bgPromptTemplate` (concatenated automatically by the orchestrator). Your `bgImagePrompt` should *agree* with that register, not fight it. If the template is **Aurora** (atmospheric gradient) and you write a prompt that asks for a flat hot-red Riso poster, gpt-image-2 receives mixed signals and produces a generic AI-stock image. Read `template.json.bgPromptTemplate` first, then write a content prompt that honors it.
 
-| compositionId | Reference publication | Photographic register |
+Crucially: the bg image is **fixed scenery** in this system — the template positions it (full-bleed, rounded tile, torn-edge clip, small inset, or specimen frame) and it does not move per slide. So your prompt describes *what is in the photo*, not where it sits on the slide.
+
+| compositionId | Concept | Photographic register |
 |---|---|---|
-| `Editorial` | NYT Magazine, The New Yorker, Cereal | 35mm documentary, single window light, real surface texture, paper-cream non-image areas, one quiet brick accent. Subject in right two-thirds, left column empty for type. |
-| `Monocle` | Monocle, Bloomberg Businessweek, FT Weekend | Low-key environmental still life, single overcast/fluorescent, low contrast, navy + cream + one coral note. Subject central, upper third plain. |
-| `Riso` | RISOTTO Studio, Print magazine | Single subject flat on hot-red seamless paper, hard side light, faint cyan-magenta misregistration. 032c red carrying the page. |
-| `Cover` | Vogue, W, Numéro | Full-bleed editorial portrait or still life, charcoal/neutral surroundings, single softbox/window light, one warm-metal accent. Subject in central upper half. |
-| `Index032c` | Wallpaper*, 032c, Index magazine | Industrial-design product shot or environmental architecture, single subject on infinite cyc or matte-black wall, hard side light, deep blacks dominating, one chartreuse note. |
+| `Aurora` | Atmospheric gradient (Cool Blue / Drama Club) | Single subject silhouetted against deep navy → opal-lilac volumetric haze, single soft directional light, cool palette dominates, one cosmic-pink note. Image renders full-bleed beneath a vertical scrim, so frame for ambient legibility. |
+| `Gummy` | Hyperreal-3D candy (Gimme Gummy) | Single glossy/jelly object photographed flat on butter-cream seamless, hard side light producing a short crisp shadow, real-object-on-paper register (NOT CGI glass), one bubblegum-pink or electric-lime accent. Image renders inside a tilted rounded card, so center the subject with breathing space. |
+| `Zine` | Counterculture photocopy (Pick-and-Mix / Warning Low Ink) | Torn ticket / faded receipt / stencilled wall on newsprint paper, high contrast, visible cyan/magenta misregistration on midtones, paper grain, risograph-red or acid-yellow note. Image renders inside a torn-edge polygon clip with halftone overlay, so subject can fill the frame. |
+| `Kinetic` | Industrial black-field (Typographic Maximalism) | Single hard-lit subject (key-cap, stainless hinge, server-rack ear, PCB trace) on matte-black, deep blacks dominate, one acid chartreuse note. Image renders as a small 280×280 inset stamp behind huge type, so frame the subject TIGHT with empty matte-black around it. |
+| `Dossier` | Specimen-sheet (Micrographics / Heritage / Blueprint) | Single object on warm cream paper #f1ead6, top-down or near-top-down, single overcast/window light, low contrast, paper grain visible, blueprint-cyan accent + crimson FILED stamp. Image renders inside a specimen frame with corner brackets, so center the object on a clean cream field. |
 
 ## Worked examples (copy and adapt these — one per template)
 
-### Editorial — NYT Magazine register, slide 0 for an opinion topic
+### Aurora — atmospheric gradient, slide 0 for an essay / opinion topic
 ```
-A worn wooden floor at the corner of a Yeouido apartment, a paperback cracked open spine-up beside a half-empty cream-colored mug, the steam catching the morning light. Subject sits in the right two-thirds of the frame; the upper-left is a plain warm-cream wall with no objects on it. 35mm film grain, shallow depth of field, single north-facing window light, dust motes visible. Real paper-edge texture, condensation on the mug, slight skin tone in a hand barely entering the frame from the right. Muted earth tones, one quiet brick accent from a folded scarf at the edge of the floor.
-```
-
-### Monocle — Briefing register, slide 0 for a finance topic
-```
-A Yeouido high-rise lobby photographed at low elevation early morning, the security desk's stainless rim catching one warm tungsten lamp, the rest of the lobby in cool overcast tone from the floor-to-ceiling glass. A single printed Bloomberg Terminal page lies on the marble, three numbers circled in red pen. Documentary 50mm, no person in frame, the upper third of the photograph is plain dark glass with a faint city haze behind. Cool navy and paper-cream palette, one coral-red note from the pen circles only.
+A single hand emerging slowly from cool gradient fog, fingers half-lit, the rest of the figure dissolving into deep navy haze that bleeds upward into opal lilac. 50mm portrait lens, single soft window light from camera-left, the rest of the frame is volumetric atmosphere — no walls, no floor, just gradient depth. Cool palette only: deep navy → indigo → lilac. One cosmic-pink note from a thin enamel ring on the index finger, nothing else colored. The subject sits in the central vertical band; the upper third is pure gradient sky, the lower third bleeds into deep navy. No CGI, no glow, no holographic interfaces — only ambient atmosphere and depth.
 ```
 
-### Riso — Hot Poster register, slide 0 for a trend / hot-take topic
+### Gummy — hyperreal-3D candy, slide 0 for a trend / MZ topic
 ```
-A single ripe persimmon balanced on top of a 1990s rotary telephone, photographed dead-center on a flat hot-red seamless paper backdrop. Hard key light from camera-left producing a sharp short shadow on the right. Color separation pushed slightly so faint cyan dot misregistration is visible on the persimmon's midtones (offset-print artifact). Waxy fruit skin, scuffed bakelite phone, dust on the cord. Upper 25% of the frame is plain hot-red seamless with no objects, ready for a headline. Pantone-032c red and paper-cream margin only.
-```
-
-### Cover — Vogue/Numéro register, slide 0 for a quote / lifestyle topic
-```
-A wool coat draped over a vintage chair photographed at the shoulder line, charcoal wallpaper behind, one single softbox window light from camera-right falling across the lapel and dying into shadow on the left. The coat's wool weave is visible up close, a brass button catches a single warm-metal highlight. No face, no logo. Composition is full-bleed; the subject occupies the central upper two-thirds of the frame, leaving the lower third in plain shadow for typography. Cool charcoal palette, one burnished-gold note on the button only.
+A single glossy strawberry-shaped jelly candy photographed flat on a butter-cream seamless paper backdrop, one hard key light from camera-left producing a sharp short shadow on the right. The candy's surface catches a tight specular highlight — translucent gel, faint sugar dust, slight stickiness on the tile beside it. 50mm macro, real-object-on-paper register (NOT CGI glass, NOT 3D render). One bubblegum-pink note from a tiny plastic tag attached by a string, no other accent color. The subject sits centered with breathing space around it; upper 25% of the frame is plain butter-cream backdrop ready for a headline tile.
 ```
 
-### Index — Wallpaper*/032c register, slide 0 for an AI / tech topic
+### Zine — counterculture photocopy, slide 0 for a quote / counterculture topic
 ```
-A single Korean mechanical keyboard with hangul-engraved keycaps photographed dead-center on an infinite matte-black cyc, one hard key light from camera-right producing a clean short shadow on the cyc. The keyboard's stainless top plate catches the light; the keycaps are slightly worn at the most-pressed letters. Negative space dominates: roughly 60% of the frame is empty matte black around the subject. One acid chartreuse note appears on a single packaging sticker on the side of the keyboard, no other color. No glamour, no glow, no studio polish.
+A torn paper ticket stub stuck to a stencilled wall with a single piece of masking tape, photographed flat at slight oblique angle. The wall paint is chipped, the ticket's edge is uneven from being torn by hand, half-faded ink lettering on it. High contrast lighting with visible cyan-magenta misregistration on the midtones (offset-print artifact, NOT digital glow). Paper grain, photocopy debris around the edges. Risograph red on the masking tape's faint pattern, acid-yellow stencil mark on the wall behind. Subject fills most of the frame; upper 25% is plain wall texture for a ransom-note kicker stamp overlay. No on-screen text inside the photograph itself.
+```
+
+### Kinetic — industrial black-field, slide 0 for an AI / tech topic
+```
+A single Korean mechanical keyboard keycap with a hangul-engraved 'ㄱ' character photographed at a tight oblique angle on a matte-black surface, one hard key light from camera-right producing a clean short shadow. The keycap's plastic edge catches a single highlight; the rest of the frame is deep matte black with subtle dust grain visible only at the keycap's base. The keycap occupies roughly 25% of the frame, sitting in the upper-right quadrant — the rest of the image is empty matte black so the typography overlay (which fills most of the slide) can sit cleanly. One acid chartreuse note from a tiny status LED beside the keycap, no other color. No glamour, no glow, no studio polish.
+```
+
+### Dossier — specimen-sheet, slide 0 for a finance / data topic
+```
+A folded printed ledger sheet on warm cream paper, photographed top-down, with a fountain pen and a single brass paperweight resting on the corner. A faint pale-cyan blueprint grid is just visible beneath the cream paper. Single overcast natural light from a north-facing window, low contrast, paper grain and ink texture visible. The cream paper takes up the entire field; the ledger and pen sit slightly off-center to leave the upper third of the frame for the italic-serif headline overlay. One small crimson 도장 stamp at the corner of the ledger, one blueprint-cyan note from a thin pen-line on the printed sheet. No glamour, no studio set, no people.
 ```
 
 ### Threads card (vertical 2:3, single subject)

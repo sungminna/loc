@@ -152,15 +152,17 @@ See `.claude/skills/image-gen/SKILL.md` for the full vocabulary cheatsheet and 4
 
 #### Match the prompt to the template's photographic register
 
-Each of the 5 curated templates is anchored to a real publication. Read `template.json.bgPromptTemplate` first — it tells you which photographic register the deck is committed to — and write a content prompt that *agrees* with it, not one that fights it. A finance brief on the Cover template should not request a Bloomberg trader desk; it should request a single ceramic vessel on raw linen with one warm-metal note. Conversely, a finance brief on Monocle should request a Yeouido lobby at low elevation, not a serene domestic still life. The orchestrator concatenates `topic.imageStylePrompt + template.bgPromptTemplate + your bgImagePrompt`, so a register conflict shows up as a generic AI-stock image.
+Each of the 5 curated 2026-redesign templates carries its own photographic register. Read `template.json.bgPromptTemplate` first — it tells you which register the deck is committed to — and write a content prompt that *agrees* with it, not one that fights it. A finance brief on the **Aurora** template should not request a Bloomberg trader desk; it should request a hand or object emerging from cool gradient fog with a single cosmic-pink note. A finance brief on **Dossier** should request a folded ledger on cream paper beneath a faint blueprint grid. The orchestrator concatenates `topic.imageStylePrompt + template.bgPromptTemplate + your bgImagePrompt`, so a register conflict shows up as a generic AI-stock image.
+
+Crucially: the bg image is **fixed scenery** in the new system — it does not move per slide and it is positioned by the template, never by the prompt. So your prompt describes *what is in the photo*, not where it sits on the slide. The template owns layout.
 
 | compositionId | Best subject family |
 |---|---|
-| `Editorial` | NYT Magazine — domestic, hand-related still life, real-place reportage |
-| `Monocle` | Monocle/Bloomberg — desks, lobbies, ledgers, low-elevation cityscape |
-| `Riso` | RISOTTO Studio — single object dead-center on hot-red seamless |
-| `Cover` | Vogue/Numéro — single subject at shoulder line, charcoal surrounds |
-| `Index032c` | Wallpaper*/032c — industrial-design product on matte-black cyc |
+| `Aurora` | Atmospheric / Cool Blue — single subject silhouetted against deep navy → opal-lilac volumetric haze; cosmic-pink note. (essay, opinion, quiet observation) |
+| `Gummy` | Tactile candy — single glossy/jelly object photographed flat on butter-cream seamless, hard side light, bubblegum-pink or electric-lime accent. (trends, MZ, playful) |
+| `Zine` | Counterculture photocopy — torn ticket / faded receipt / stencilled wall on newsprint paper, halftone misregistration, risograph-red or acid-yellow note. (counterculture, irreverent quotes) |
+| `Kinetic` | Industrial black-field — single hard-lit subject (key-cap, hinge edge, server-rack ear) on matte-black, deep blacks dominate; image becomes a small inset stamp behind huge type. (AI, dev tooling, frontier) |
+| `Dossier` | Specimen-sheet — single object on warm cream paper with a faint blueprint grid, top-down or near-top-down, paper grain visible, blueprint-cyan + crimson accents. (finance, data-heavy briefings) |
 
 ### slides[0].bgImagePrompt — the cover frame (treat it specially)
 

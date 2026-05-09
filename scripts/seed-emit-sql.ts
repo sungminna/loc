@@ -24,12 +24,22 @@ function templateInsert(
   defaultAudioMood: string, bgPromptTemplate: string,
 ): void {
   const platform = kind === "threads-photo" ? "threads" : "instagram";
+  // ON CONFLICT(id) DO UPDATE — re-seeding must overwrite existing rows.
+  // See scripts/seed.ts for the rationale (INSERT OR IGNORE silently
+  // skipped legacy collisions like ko-ai-kinetic during the May 2026
+  // redesign).
   STATEMENTS.push({
-    sql: `INSERT OR IGNORE INTO templates
+    sql: `INSERT INTO templates
       (id, user_id, slug, name, kind, platform, composition_id, schema, defaults, default_audio_mood,
        duration_sec, version, enabled, accent_color, bg_prompt_template, transition_preset,
        bg_mode, default_bg_r2_key, created_at, updated_at)
-      VALUES (?, NULL, ?, ?, ?, ?, ?, '{}', '{}', ?, ?, 1, 1, ?, ?, 'fade', 'ai', '', ?, ?)`,
+      VALUES (?, NULL, ?, ?, ?, ?, ?, '{}', '{}', ?, ?, 1, 1, ?, ?, 'fade', 'ai', '', ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        slug=excluded.slug, name=excluded.name, kind=excluded.kind, platform=excluded.platform,
+        composition_id=excluded.composition_id, default_audio_mood=excluded.default_audio_mood,
+        duration_sec=excluded.duration_sec, enabled=1,
+        accent_color=excluded.accent_color, bg_prompt_template=excluded.bg_prompt_template,
+        updated_at=excluded.updated_at`,
     params: [id, slug, name, kind, platform, compositionId, defaultAudioMood, durationSec, accentColor, bgPromptTemplate, now, now],
   });
 }

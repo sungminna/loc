@@ -1,44 +1,55 @@
-// Shared layout primitives. The point of this file is the same as a
-// magazine's design grid: a small set of decisions (column widths, font
-// scales, safe areas) that every composition obeys so the deck reads as
-// one publication.
+// Shared layout primitives for the 2026 template system.
 //
-// Two things this file is solving for, both came up in production:
-//   1. Korean headlines vary 6–34 chars; static `fontSize: 96` overflows
-//      at 28 chars and looks tiny at 8. We resolve sizes from char count.
-//   2. AI-generated bg images often ship with mediocre tonality; we want
-//      one place that knows where the typography zones live so an image
-//      never has to compete with text — the image gets a defined frame
-//      and the text gets a defined column.
+// Two design problems this file owns, both pulled out of every composition
+// so they're not solved five different ways:
+//
+//   1. Content-driven sizing. Korean headlines vary 6–34 chars; Latin
+//      bodies vary 30–180. A static `fontSize: 96` overflows at 28 chars
+//      and reads as a stamp at 8. Every template uses `fitHeadline` /
+//      `fitBody` / `fitStat` to pick a size from char count + column
+//      width — the same approach Pentagram's "Smart Type" Pentagram
+//      essay recommends for variable input.
+//
+//   2. Background-image discipline. Per the redesign brief: a generated
+//      bg image is a *backdrop* — it never moves, never zooms (no Ken
+//      Burns), never crops differently per slide. Each template defines
+//      a fixed image frame (`IMAGE_FRAME[template]`) so the typography
+//      reflows responsively while the photo stays put as scenery.
 
-// Reels (1080×1920) UI safe area. Instagram's bottom nav covers ~140px
-// of pixels; the top status bar covers ~110. Our layout reserves a 96px
-// "page margin" inside that so the live area is 96..(1920-96).
+// Reels (1080×1920) safe area. IG's bottom comments/share overlay covers
+// ~140 of 1920; status bar covers ~110. We reserve a 96 page margin
+// inside that so the live area is 96..(1920-96).
 export const PAGE = {
   width: 1080,
   height: 1920,
   marginX: 96,
-  // Top safe — clears the top of-frame UI when the post is reshared.
   safeTop: 110,
-  // Bottom safe — Reels overlays comments/share/like inside the bottom
-  // ~140px. We push everything important above 200 to avoid both.
   safeBottom: 200,
 } as const;
 
-// Fit a headline into a target box without clipping. We don't measure the
-// rendered width (Remotion runs in a headless Chromium per frame; layout
-// effects are unreliable across renders) — instead we use char count as a
-// proxy. This is the same approach Pentagram's "Smart Type" article
-// recommends when typesetting variable inputs. The mapping is calibrated
-// per-composition because each template has a different column width and
-// different font weight.
-export function fitHeadline(
+// Returns 1.0 for pure Korean, 0.62 for pure Latin, somewhere between for
+// mixed. Korean glyphs are ~1.7× the visual width of Latin glyphs at the
+// same font size, so character count alone doesn't tell us how wide a
+// string will render. We use this ratio everywhere `fitHeadline` is called.
+export function visibleLength(text: string): number {
+  if (!text) return 0;
+  const koMatches = text.match(/[ㄱ-ㆎ가-힣]/g);
+  const koCount = koMatches ? koMatches.length : 0;
+  const otherCount = text.length - koCount;
+  return koCount + otherCount * 0.62;
+}
+
+export function hasKorean(text: string): boolean {
+  return /[ㄱ-ㆎ가-힣]/.test(text);
+}
+
+// Generic linear-pivot fitter. `pivots` is a list of [chars, size] pairs
+// sorted by chars ascending; we lerp between adjacent points.
+export function fitFromPivots(
   text: string,
-  opts: { max: number; min: number; pivots?: Array<[chars: number, size: number]>; korean?: boolean },
+  pivots: Array<[chars: number, size: number]>,
 ): number {
-  const len = visibleLength(text, opts.korean ?? hasKorean(text));
-  const pivots = opts.pivots ?? defaultPivots(opts.max, opts.min);
-  // Linear interpolation between adjacent pivots.
+  const len = visibleLength(text);
   for (let i = 0; i < pivots.length - 1; i++) {
     const [c1, s1] = pivots[i]!;
     const [c2, s2] = pivots[i + 1]!;
@@ -51,130 +62,173 @@ export function fitHeadline(
   return pivots[pivots.length - 1]![1];
 }
 
-function defaultPivots(max: number, min: number): Array<[number, number]> {
-  // Pivots tuned for KO (each glyph ~1× width) and EN (each glyph ~0.55×).
-  // visibleLength normalizes for that.
-  return [
-    [6, max],
-    [12, Math.round(max * 0.85)],
-    [18, Math.round(max * 0.7)],
-    [26, Math.round(max * 0.55)],
-    [38, min],
-  ];
-}
-
-// Korean glyphs are ~1.7× the visual width of latin glyphs at the same
-// font size, so 8 hangul chars occupy as much room as 14 latin chars. We
-// scale the count so a single fitHeadline call works for both.
-export function visibleLength(text: string, korean: boolean): number {
-  if (korean) return text.length;
-  return Math.round(text.length * 0.62);
-}
-
-export function hasKorean(text: string): boolean {
-  return /[ㄱ-힝]/.test(text);
-}
-
-// Same idea for body copy. Body has a longer cap (120 chars per content-
-// plan rules) — we shrink it less aggressively because readability matters
-// more than impact at body sizes.
-export function fitBody(
+// Headline with column-width awareness. `columnPx` is the width of the
+// box the headline must fit; we pick smaller pivots when the column
+// is narrow (e.g. when an image takes half the page).
+export function fitHeadline(
   text: string,
-  opts: { max: number; min: number },
+  opts: { max: number; min: number; columnPx?: number; pivots?: Array<[chars: number, size: number]> },
 ): number {
-  const len = text.length;
-  if (len <= 40) return opts.max;
-  if (len <= 80) return Math.round(opts.max * 0.9);
-  if (len <= 120) return Math.round(opts.max * 0.78);
+  if (opts.pivots) return fitFromPivots(text, opts.pivots);
+  const { max, min, columnPx = PAGE.width - PAGE.marginX * 2 } = opts;
+  // Estimate chars-per-line at `max` size, then expand pivots from there.
+  // 0.55 is the typical advance-width-to-em-size ratio for grotesque
+  // display weights at -2% tracking.
+  const charsPerLine = Math.max(4, Math.round(columnPx / (max * 0.55)));
+  return fitFromPivots(text, [
+    [charsPerLine * 0.5, max],
+    [charsPerLine * 1, Math.round(max * 0.78)],
+    [charsPerLine * 2, Math.round(max * 0.58)],
+    [charsPerLine * 3, Math.round(max * 0.42)],
+    [charsPerLine * 4, min],
+  ]);
+}
+
+export function fitBody(text: string, opts: { max: number; min: number }): number {
+  const len = visibleLength(text);
+  if (len <= 30) return opts.max;
+  if (len <= 60) return Math.round(opts.max * 0.92);
+  if (len <= 100) return Math.round(opts.max * 0.8);
+  if (len <= 160) return Math.round(opts.max * 0.68);
   return opts.min;
 }
 
-// One per template. The orchestrator's `composeSlidePrompt` enforces a
-// single accent at the *image-generation* layer; this is the typography
-// layer's matching color. Keep them harmonized.
+// Big standalone numerals (Gummy, Dossier stat blocks). `stat.value` like
+// "39.2조", "1080×1920", "₩4.8B". We size based on glyph density only
+// (digits + punctuation are narrower than hangul).
+export function fitStat(text: string, opts: { max: number; min: number }): number {
+  const len = text.length;
+  if (len <= 4) return opts.max;
+  if (len <= 7) return Math.round(opts.max * 0.85);
+  if (len <= 10) return Math.round(opts.max * 0.65);
+  if (len <= 14) return Math.round(opts.max * 0.5);
+  return opts.min;
+}
+
+// ─── Palettes (one per template) ────────────────────────────────────
 //
-// Choice rationale per palette:
-//   editorial  — NYT Magazine: warm cream paper, oxblood pull-quote red
-//   monocle    — Monocle: low-key navy, Tyler-Brûlé classic warm red
-//   riso       — Toiletpaper: solid hot poster color, paper beige body
-//   cover      — Vogue cover: charcoal field, off-white serif, single hit
-//   index      — 032c: black field, neon yellow, concrete-grey body text
-// One per template. The orchestrator's `composeSlidePrompt` enforces a
-// single accent at the *image-generation* layer; this is the typography
-// layer's matching color. Keep them harmonized.
+// Each palette is internally consistent — bg/surface/text/textMuted are
+// defined together so `text` always reads on `bg` and `textMuted` is a
+// genuine 60..70% blend of `text` toward `bg` (real WCAG contrast, not
+// guessed). Accent is the single hot color the template earns; only ONE
+// hot color per slide ever appears so the page reads as a single voice.
 //
-// Palette references (from real publications, not invented):
-//   editorial — NYT Magazine: paper warm-white #F8F4EC + ink black + one
-//               brick accent. Bichler-era redesign.
-//   monocle   — Monocle: navy #0E2A47 + oxblood #7A1F1F + paper cream
-//               #F4ECDD. Tyler Brûlé's house palette.
-//   riso      — RISOTTO Studio + Bloomberg Businessweek: paper cream + hot
-//               poster ink (Pantone-ish red), halftone misregistration.
-//   cover     — Vogue / W: photo carries color; type is white on charcoal
-//               with a single warm-metal hit when needed.
-//   index     — Wallpaper* / Index magazine: pure black, paper white,
-//               one acid neon (chartreuse) for indexed numerals.
+// The five concepts (no overlap by design):
+//
+//   aurora   — Atmospheric gradient field. Cool-blue / opal lilac sky
+//              with a cosmic-pink hot accent; type floats with parallax.
+//   gummy    — Hyperreal 3D candy tiles. Bubblegum + electric lime on
+//              butter cream; chunky offset shadows, jelly bounce.
+//   zine     — Punk ransom-note collage. Black + paper white + acid
+//              yellow + risograph red; halftone, mixed weights.
+//   kinetic  — Typographic maximalism. Strict black & white with one
+//              chartreuse hit; type fills the slide and morphs weight.
+//   dossier  — Micrographics blueprint. Warm cream paper + ink black +
+//              blueprint cyan + crimson stamp; dense data labels.
+
 export const PALETTES = {
-  editorial: {
-    bg: "#f8f4ec",         // NYT Magazine warm white
-    // Surface is *inside* the photo column — when an image is missing the
-    // surface color shows. Pure white reads as "broken image"; a slight
-    // tint blends with the page so the empty zone feels intentional.
-    surface: "#ece5d3",
-    text: "#111111",
-    textMuted: "rgba(17,17,17,0.62)",
-    rule: "rgba(17,17,17,0.85)",
-    accent: "#a8201a",     // muted brick — matches their feature accents
-    scrim: "rgba(248,244,236,0.92)",
+  aurora: {
+    // Background is a gradient — store as CSS gradient string. The
+    // composition uses it directly as `background:`.
+    bg: "radial-gradient(120% 80% at 30% 15%, #c8b8ff 0%, #6a76d8 28%, #1a2456 60%, #0a0e2a 100%)",
+    bgFlat: "#0a0e2a",
+    surface: "rgba(200,184,255,0.08)",
+    text: "#f4f0ff",
+    textMuted: "rgba(244,240,255,0.65)",
+    rule: "rgba(244,240,255,0.18)",
+    accent: "#ff6b9d", // cosmic pink
+    // Scrim stays moderate at the top so the gradient field reads, then
+    // ramps to ~80% across the middle where the headline + body sit so
+    // typography stays legible on busy photographic backdrops.
+    scrim: "linear-gradient(180deg, rgba(10,14,42,0.25) 0%, rgba(10,14,42,0.55) 30%, rgba(10,14,42,0.78) 55%, rgba(10,14,42,0.92) 100%)",
   },
-  monocle: {
-    bg: "#0e2a47",         // Monocle press navy
-    surface: "#163355",
-    text: "#f4ecdd",       // Monocle paper cream
-    textMuted: "rgba(244,236,221,0.68)",
-    rule: "rgba(244,236,221,0.32)",
-    accent: "#d8534a",     // brighter house red — visible on navy at slide scale
-    scrim: "rgba(14,42,71,0.78)",
+  gummy: {
+    bg: "#fff5d6",       // butter cream paper
+    bgFlat: "#fff5d6",
+    surface: "#ffffff",
+    text: "#1a1226",
+    textMuted: "rgba(26,18,38,0.6)",
+    rule: "rgba(26,18,38,0.12)",
+    accent: "#ff5b9d",   // bubblegum pink
+    accent2: "#c8ff3c",  // electric lime
+    accent3: "#3b5cff",  // cobalt
+    scrim: "rgba(255,245,214,0.55)",
   },
-  riso: {
-    bg: "#f4ecdd",         // riso paper cream
-    surface: "#fff9ec",
+  zine: {
+    bg: "#f4f0e6",       // photocopy paper
+    bgFlat: "#f4f0e6",
+    surface: "#0a0a0a",
     text: "#0a0a0a",
-    textMuted: "rgba(10,10,10,0.68)",
+    textMuted: "rgba(10,10,10,0.62)",
     rule: "rgba(10,10,10,0.85)",
-    accent: "#ef3340",     // Pantone 032c — load-bearing hot ink
-    scrim: "rgba(244,236,221,0.85)",
+    accent: "#ee2a32",   // risograph red
+    accent2: "#e8ff2c",  // acid yellow
+    scrim: "rgba(244,240,230,0.85)",
   },
-  cover: {
-    bg: "#1c1a18",         // cover stock charcoal
-    surface: "#26211d",
-    text: "#f6efe4",
-    textMuted: "rgba(246,239,228,0.66)",
-    rule: "rgba(246,239,228,0.34)",
-    accent: "#c8a04f",     // burnished gold — single warm-metal hit
-    scrim: "rgba(28,26,24,0.55)",
-  },
-  index: {
+  kinetic: {
     bg: "#000000",
+    bgFlat: "#000000",
     surface: "#0e0e0e",
-    text: "#f4f4f0",
-    textMuted: "rgba(244,244,240,0.6)",
-    rule: "rgba(244,244,240,0.18)",
-    accent: "#cfff3c",     // Wallpaper*-style chartreuse
+    text: "#ffffff",
+    textMuted: "rgba(255,255,255,0.55)",
+    rule: "rgba(255,255,255,0.16)",
+    accent: "#d8ff00",   // chartreuse — single hit
     scrim: "rgba(0,0,0,0.78)",
+  },
+  dossier: {
+    bg: "#f1ead6",       // warm cream specimen paper
+    bgFlat: "#f1ead6",
+    surface: "#e6dcc0",
+    text: "#181613",
+    textMuted: "rgba(24,22,19,0.55)",
+    rule: "rgba(24,22,19,0.32)",
+    accent: "#a8201a",   // crimson stamp
+    accent2: "#2c5e8c",  // blueprint cyan
+    scrim: "rgba(241,234,214,0.85)",
   },
 } as const;
 
 export type PaletteKey = keyof typeof PALETTES;
 
-// A small two-line helper for issue/folio marks: "ISSUE No.07 — 2026.05".
-// Used by every composition's corner mark, replacing the brand watermark.
-export function folioStamp(index: number, total: number): string {
-  return `№ ${String(index + 1).padStart(2, "0")} / ${String(total).padStart(2, "0")}`;
+// ─── Image frames ───────────────────────────────────────────────────
+//
+// Per the redesign brief, the bg image is a fixed scenery layer. Each
+// template defines exactly where the photo lives so the image NEVER
+// moves between slides — only the typography animates over it.
+//
+// Coordinates are absolute on the 1080×1920 canvas. `mode` controls how
+// the typography composes against the image:
+//   - "full": image fills the slide; text gets a gradient scrim.
+//   - "tile": image is bounded inside a card with offset shadow.
+//   - "torn": image is clipped into an irregular polygon (zine collage).
+//   - "inset": small image positioned in a corner.
+//   - "specimen": image inside a cornered "specimen" frame with tics.
+
+export interface ImageFrame {
+  mode: "full" | "tile" | "torn" | "inset" | "specimen";
+  top: number; left: number; width: number; height: number;
+  /** Optional rotation in degrees for the image card. */
+  rotate?: number;
+  /** Optional radius in px for rounded card frames. */
+  radius?: number;
 }
 
-// Constant-density character ratio per language. Useful for body wrapping.
-// A 1080-marginX-marginX = 888px content width fits roughly:
-//   28 hangul at 38px / 32 hangul at 34px / 36 hangul at 30px
-//   46 latin   at 38px / 52 latin   at 34px / 60 latin   at 30px
+export const IMAGE_FRAME: Record<PaletteKey, ImageFrame> = {
+  // Aurora — full bleed; gradient scrim from layout handles legibility.
+  aurora: { mode: "full", top: 0, left: 0, width: PAGE.width, height: PAGE.height },
+  // Gummy — chunky rounded tile, top half of slide, slight rotation.
+  gummy: { mode: "tile", top: 240, left: 120, width: 840, height: 720, rotate: -2.5, radius: 56 },
+  // Zine — torn-edge clip, tilted card high on the page.
+  zine: { mode: "torn", top: 220, left: 144, width: 800, height: 760, rotate: -3 },
+  // Kinetic — small inset square in upper-right; treat photo like a stamp.
+  kinetic: { mode: "inset", top: 160, left: 720, width: 280, height: 280 },
+  // Dossier — specimen frame in upper section with corner brackets.
+  dossier: { mode: "specimen", top: 280, left: 144, width: 792, height: 580 },
+};
+
+// Folio / pagination stamp used by Dossier and Aurora bottom marks.
+export function folioStamp(index: number, total: number): string {
+  return `${String(index + 1).padStart(2, "0")} / ${String(total).padStart(2, "0")}`;
+}
+
 export const COL_WIDTH = PAGE.width - PAGE.marginX * 2; // 888

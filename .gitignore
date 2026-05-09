@@ -17,3 +17,7 @@ out/
 # QA screenshots (Playwright captures during dashboard smoke tests)
 *.png
 !docs/**/*.png
+
+# Local Remotion QA artifacts (visual-review + qa-templates + qa-render-mp4 outputs)
+review/
+qa/

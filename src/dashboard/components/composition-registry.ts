@@ -6,11 +6,11 @@
 // Remotion's renderer but adds dead weight to the dashboard bundle).
 
 import type { ComponentType } from "react";
-import { Editorial, defaultEditorialProps } from "@/remotion/compositions/Editorial";
-import { Monocle, defaultMonocleProps } from "@/remotion/compositions/Monocle";
-import { Riso, defaultRisoProps } from "@/remotion/compositions/Riso";
-import { Cover, defaultCoverProps } from "@/remotion/compositions/Cover";
-import { Index032c, defaultIndex032cProps } from "@/remotion/compositions/Index032c";
+import { Aurora, defaultAuroraProps } from "@/remotion/compositions/Aurora";
+import { Gummy, defaultGummyProps } from "@/remotion/compositions/Gummy";
+import { Zine, defaultZineProps } from "@/remotion/compositions/Zine";
+import { Kinetic, defaultKineticProps } from "@/remotion/compositions/Kinetic";
+import { Dossier, defaultDossierProps } from "@/remotion/compositions/Dossier";
 import { ThreadsCard, defaultThreadsCardProps, type ThreadsCardProps } from "@/remotion/compositions/ThreadsCard";
 import { SeedanceReel, defaultSeedanceReelProps } from "@/remotion/compositions/SeedanceReel";
 import type { CardSlideProps, VideoReelProps } from "@/remotion/types";
@@ -21,11 +21,11 @@ type AnyComp = ComponentType<Record<string, unknown>>;
 
 // Match Root.tsx — keep these in sync if you tune frames-per-slide there.
 const SLIDE_FRAMES_BY_COMP: Record<string, number> = {
-  Editorial: 156,
-  Monocle: 162,
-  Riso: 156,
-  Cover: 168,
-  Index032c: 150,
+  Aurora: 168,
+  Gummy: 156,
+  Zine: 156,
+  Kinetic: 156,
+  Dossier: 162,
 };
 
 const FPS = 30;
@@ -47,7 +47,7 @@ export interface RegistryEntry {
 
 const cardDuration = (compId: string) => (props: Record<string, unknown>) => {
   const slides = (props as unknown as CardSlideProps).slides ?? [];
-  const slideFrames = SLIDE_FRAMES_BY_COMP[compId] ?? 150;
+  const slideFrames = SLIDE_FRAMES_BY_COMP[compId] ?? 156;
   return Math.max(FPS * 6, slideFrames * Math.max(1, slides.length) + 12);
 };
 
@@ -58,45 +58,45 @@ const videoDuration = (props: Record<string, unknown>) => {
 };
 
 export const compositionRegistry: Record<string, RegistryEntry> = {
-  Editorial: {
-    Component: Editorial as unknown as AnyComp,
-    defaults: defaultEditorialProps as unknown as Record<string, unknown>,
+  Aurora: {
+    Component: Aurora as unknown as AnyComp,
+    defaults: defaultAuroraProps as unknown as Record<string, unknown>,
     width: 1080, height: 1920, fps: FPS,
-    durationFromProps: cardDuration("Editorial"),
+    durationFromProps: cardDuration("Aurora"),
     briefShape: "card",
-    label: "Editorial — NYT Magazine",
+    label: "Aurora — Atmospheric Gradient",
   },
-  Monocle: {
-    Component: Monocle as unknown as AnyComp,
-    defaults: defaultMonocleProps as unknown as Record<string, unknown>,
+  Gummy: {
+    Component: Gummy as unknown as AnyComp,
+    defaults: defaultGummyProps as unknown as Record<string, unknown>,
     width: 1080, height: 1920, fps: FPS,
-    durationFromProps: cardDuration("Monocle"),
+    durationFromProps: cardDuration("Gummy"),
     briefShape: "card",
-    label: "Monocle — Briefing",
+    label: "Gummy — Hyperreal 3D / Candy",
   },
-  Riso: {
-    Component: Riso as unknown as AnyComp,
-    defaults: defaultRisoProps as unknown as Record<string, unknown>,
+  Zine: {
+    Component: Zine as unknown as AnyComp,
+    defaults: defaultZineProps as unknown as Record<string, unknown>,
     width: 1080, height: 1920, fps: FPS,
-    durationFromProps: cardDuration("Riso"),
+    durationFromProps: cardDuration("Zine"),
     briefShape: "card",
-    label: "Riso — Hot Poster",
+    label: "Zine — Counterculture / Pick-and-Mix",
   },
-  Cover: {
-    Component: Cover as unknown as AnyComp,
-    defaults: defaultCoverProps as unknown as Record<string, unknown>,
+  Kinetic: {
+    Component: Kinetic as unknown as AnyComp,
+    defaults: defaultKineticProps as unknown as Record<string, unknown>,
     width: 1080, height: 1920, fps: FPS,
-    durationFromProps: cardDuration("Cover"),
+    durationFromProps: cardDuration("Kinetic"),
     briefShape: "card",
-    label: "Cover — Vogue/Numéro",
+    label: "Kinetic — Typographic Maximalism",
   },
-  Index032c: {
-    Component: Index032c as unknown as AnyComp,
-    defaults: defaultIndex032cProps as unknown as Record<string, unknown>,
+  Dossier: {
+    Component: Dossier as unknown as AnyComp,
+    defaults: defaultDossierProps as unknown as Record<string, unknown>,
     width: 1080, height: 1920, fps: FPS,
-    durationFromProps: cardDuration("Index032c"),
+    durationFromProps: cardDuration("Dossier"),
     briefShape: "card",
-    label: "Index — Wallpaper*/032c",
+    label: "Dossier — Micrographics / Blueprint",
   },
   SeedanceReel: {
     Component: SeedanceReel as unknown as AnyComp,

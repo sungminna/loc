@@ -723,7 +723,7 @@ async function stage_render(
 
   // ── Reel (IG) ─────────────────────────────────────────────────────
   if (ctx.topic.targetAccounts.instagram && brief.reel?.slides?.length) {
-    const compositionId = ctx.template?.compositionId ?? "Editorial";
+    const compositionId = ctx.template?.compositionId ?? "Aurora";
     const accent = ctx.template?.accentColor ?? "";
     const args = [
       `bun src/sandbox/render-reel.ts`,

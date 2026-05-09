@@ -366,8 +366,8 @@ function StoryboardTab({
   const toast = useToast();
   const templates = trpc.templates.list.useQuery();
   const selectedTemplate = (templates.data ?? []).find((t) => t.slug === topic.templateSlugs[0]);
-  const compositionId = selectedTemplate?.compositionId ?? "Editorial";
-  const templateAccent = selectedTemplate?.accentColor ?? "#a8201a";
+  const compositionId = selectedTemplate?.compositionId ?? "Aurora";
+  const templateAccent = selectedTemplate?.accentColor ?? "#ff6b9d";
   const isVideoReel = compositionId === "SeedanceReel" || selectedTemplate?.kind === "reel-video";
 
   const saveDraft = trpc.topics.saveDraft.useMutation({
@@ -795,7 +795,7 @@ function SlideEditor({
         </Field>
 
         <details className="border-t border-zinc-800 pt-2">
-          <summary className="text-xs text-zinc-400 cursor-pointer">통계 / 인용 (Monocle · Riso · Index032c · Cover)</summary>
+          <summary className="text-xs text-zinc-400 cursor-pointer">통계 / 인용 (Gummy · Kinetic · Dossier)</summary>
           <div className="grid grid-cols-3 gap-2 mt-2">
             <Field label="stat 값">
               <input className="input text-sm" value={slide.stat?.value ?? ""}
@@ -812,7 +812,7 @@ function SlideEditor({
                 onChange={(e) => onChange({ stat: { ...(slide.stat ?? {}), label: e.target.value } })} />
             </Field>
           </div>
-          <Field label="quote 출처 (Cover 전용)">
+          <Field label="quote 출처 (선택)">
             <input className="input text-sm" value={slide.attribution ?? ""}
               onChange={(e) => onChange({ attribution: e.target.value })}
               placeholder="— 어떤 작가" />

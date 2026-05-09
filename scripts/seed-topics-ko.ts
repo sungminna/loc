@@ -90,7 +90,7 @@ const TOPICS: TopicSeed[] = [
     cron: "0 23 * * *",                      // 오전 8시 KST
     dailyRunCap: 1,
     costCapUsd: 4,
-    templateSlugs: ["ko-ai-glass", "ko-ai-kinetic", "ko-hot-take", "ko-authority-quote"],
+    templateSlugs: ["ko-ai-kinetic", "ko-quote-zine", "ko-essay-aurora"],
     sourceUrls: [
       "https://www.aitimes.com/news/articleList.html?sc_section_code=S1N1",
       "https://www.aitimes.kr/",
@@ -134,7 +134,7 @@ const TOPICS: TopicSeed[] = [
     cron: "0 0 * * 1-5",                     // 평일 오전 9시 KST
     dailyRunCap: 1,
     costCapUsd: 4,
-    templateSlugs: ["ko-finance-data", "ko-finance-minimal", "ko-listicle-top5", "ko-authority-quote"],
+    templateSlugs: ["ko-finance-dossier", "ko-essay-aurora", "ko-quote-zine"],
     sourceUrls: [
       "https://www.hankyung.com/all-news-stock",
       "https://www.mk.co.kr/news/stock/",
@@ -183,7 +183,7 @@ const TOPICS: TopicSeed[] = [
     cron: "30 22 * * 2-6",                   // 화-토 오전 7:30 KST (前날 미국장 마감 후)
     dailyRunCap: 1,
     costCapUsd: 4,
-    templateSlugs: ["ko-ai-glass", "ko-finance-data", "ko-before-after"],
+    templateSlugs: ["ko-ai-kinetic", "ko-finance-dossier", "ko-trend-gummy"],
     sourceUrls: [
       "https://www.mk.co.kr/news/it/",
       "https://www.hankyung.com/all-news-it",
@@ -228,7 +228,7 @@ const TOPICS: TopicSeed[] = [
     cron: "0 10 */2 * *",                    // 격일 저녁 7시 KST
     dailyRunCap: 1,
     costCapUsd: 5,
-    templateSlugs: ["ko-ai-kinetic", "ko-before-after", "ko-hot-take"],
+    templateSlugs: ["ko-ai-kinetic", "ko-trend-gummy", "ko-quote-zine"],
     sourceUrls: [
       "https://news.hada.io/",
       "https://www.aitimes.com/news/articleList.html?sc_section_code=S1N1",
@@ -277,7 +277,7 @@ const TOPICS: TopicSeed[] = [
     cron: "0 23 * * 0",                      // 월요일 오전 8시 KST
     dailyRunCap: 1,
     costCapUsd: 5,
-    templateSlugs: ["ko-finance-data", "ko-finance-minimal", "ko-listicle-top5"],
+    templateSlugs: ["ko-finance-dossier", "ko-essay-aurora"],
     sourceUrls: [
       "https://land.hankyung.com/",
       "https://www.mk.co.kr/news/realestate/",
@@ -321,7 +321,7 @@ const TOPICS: TopicSeed[] = [
     cron: "0 9 * * 5",                       // 금요일 오후 6시 KST
     dailyRunCap: 1,
     costCapUsd: 4,
-    templateSlugs: ["ko-listicle-top5", "ko-trend-card", "ko-hot-take"],
+    templateSlugs: ["ko-trend-gummy", "ko-essay-aurora", "ko-quote-zine"],
     sourceUrls: [
       "https://datalab.naver.com/",
       "https://news.naver.com/main/ranking/popularDay.naver",

@@ -11,17 +11,29 @@ export {};
 // audio/ncs/<slug>.mp3 keys.
 //
 // The 11 templates seeded below are the curated set after the May 2026
-// magazine-grade redesign. Each is anchored to a specific real publication
-// (NYT Magazine, Monocle, RISOTTO Studio, Vogue, Wallpaper*) so the deck
-// reads as a real publication rather than "AI card-news". The
-// `bgPromptTemplate` for each template encodes the publication's
-// photographic register; the orchestrator concatenates it after
-// `topic.imageStylePrompt` and before the use-case/constraints lines.
+// 2026-trend-driven redesign (Aurora · Gummy · Zine · Kinetic · Dossier).
+// Each composition occupies a distinct visual register and motion grammar:
 //
-// To migrate an existing deployment from the old 20+ templates to this
-// curated set, run `bun scripts/migrate-templates.ts` after seeding —
-// it disables the old slugs and reassigns each topic's templateSlugs[]
-// to the closest new equivalent based on the persona prompt.
+//   Aurora   — Atmospheric Gradients (Cool Blue / Drama Club). Cinematic
+//              radial gradient field, parallax-floating type, full-bleed
+//              image with vertical scrim. Default for cultured / opinion.
+//   Gummy    — Hyperreal 3D / Tactile (Gimme Gummy). Rounded 3D candy
+//              tiles, jelly springs, photo inside a tilted rounded card.
+//              Default for trend / playful / MZ vibes.
+//   Zine     — Counterculture / Pick-and-Mix. Ransom-note collage,
+//              halftone-clipped torn-edge image, mono ticker.
+//              Default for irreverent / opinion.
+//   Kinetic  — Typographic Maximalism. Strict B&W + one neon, variable
+//              wght axis morph, type fills the slide. Default for tech /
+//              data / AI verticals.
+//   Dossier  — Micrographics / Heritage / Blueprint. Italic editorial
+//              serif, blueprint cyan grid, registration marks, stat
+//              labels. Default for finance / data-heavy briefings.
+//
+// To migrate an existing deployment from the prior set (Editorial /
+// Monocle / Riso / Cover / Index032c), run `bun scripts/migrate-templates.ts`
+// after seeding — it disables the old slugs and reassigns each topic's
+// templateSlugs[] to the closest new equivalent based on the persona prompt.
 
 const accountId = required("CLOUDFLARE_ACCOUNT_ID");
 const databaseId = required("D1_DATABASE_ID");
@@ -31,110 +43,104 @@ const now = Date.now();
 
 const STATEMENTS: { sql: string; params: unknown[] }[] = [
   // ── 5 magazine-grade card templates ────────────────────────────
-  // Editorial — NYT Magazine / The New Yorker / Cereal lineage.
-  // Two-column page: left text, right photo. Calm, trustworthy. Default
-  // for cultured trends, opinion, lifestyle essays.
+
+  // Aurora — atmospheric gradient. Cinematic, ambient, opinion-friendly.
   templateInsert(
-    "tpl_editorial", "editorial-default", "Editorial — NYT Magazine",
-    "reel-cards", "Editorial", 21, "#a8201a",
-    '["chill","minimal","cinematic"]',
-    "NYT Magazine editorial documentary aesthetic — 35mm or medium-format film feel, single overcast or window light from one named direction, real skin and surface texture (visible pores, dust on objects, paper grain, fabric weave), composition reads as caught-in-the-moment reportage, never a posed studio composite. Warm paper-cream non-image areas (#f8f4ec); muted earth tones in the photo with one quiet brick-red or oxblood accent on a single small surface only (a sign, a fabric, a label). Photograph occupies the right two-thirds of the frame; the left vertical column is intentionally empty for typography.",
+    "tpl_aurora", "aurora-default", "Aurora — Atmospheric Gradient",
+    "reel-cards", "Aurora", 22, "#ff6b9d",
+    '["chill","ambient","cinematic"]',
+    "Atmospheric gradient cinematography — Cool Blue / Drama Club register. Subjects: a single subject silhouetted against deep navy / opal-lilac volumetric haze; a hand or object emerging from cool gradient fog; a horizon line at twilight where indigo bleeds into lilac. Single soft directional light from one named direction (window, dusk sky, fog-scattered overhead). Cool palette dominates (#0a0e2a navy → #6a76d8 → #c8b8ff lilac); one cosmic-pink note (#ff6b9d) on a single small surface only. Subject occupies the central vertical band; upper third stays as plain gradient field for headline overlay. No glamour, no studio strobes — only ambient color and depth.",
   ),
 
-  // Monocle — Monocle / Bloomberg Businessweek / FT Weekend lineage.
-  // Hairline-mast briefing layout with a horizontal photo strip and a
-  // ledger-style stat at the bottom. Default for data-heavy finance / news.
+  // Gummy — hyperreal 3D candy tile. Tactile, playful, MZ-trend.
   templateInsert(
-    "tpl_monocle", "monocle-brief", "Monocle — Briefing",
-    "reel-cards", "Monocle", 22, "#d8534a",
-    '["minimal","ambient","cinematic"]',
-    "Monocle / Bloomberg Businessweek press-room aesthetic — low-key environmental still life or commodity-object photography, single soft-overcast or single mixed-fluorescent light, low overall contrast. Restrained reportage: a desk corner with paper printouts and a coffee ring, a measured object on linen, a Yeouido or Marunouchi street detail at low elevation. Deep press-room navy (#0e2a47) and paper cream (#f4ecdd) dominate; one Monocle-style coral red appears on a single surface only — never the whole photo. Subject centered horizontally; upper third of the frame is plain so a kicker bar can sit above.",
-  ),
-
-  // Riso — RISOTTO Studio / Print magazine / Bloomberg-collage. Solid
-  // poster color + halftone-stripped photo + hand-drawn arrow.
-  templateInsert(
-    "tpl_riso", "riso-poster", "Riso — Hot Poster",
-    "reel-cards", "Riso", 21, "#ef3340",
+    "tpl_gummy", "gummy-default", "Gummy — Hyperreal 3D Candy",
+    "reel-cards", "Gummy", 21, "#ff5b9d",
     '["uplifting","viral","epic"]',
-    "RISOTTO Studio / Print magazine poster aesthetic — single subject photographed flat against a solid colored seamless paper backdrop, one hard key light from the side producing a short crisp shadow, color separation pushed deliberately so faint cyan/magenta dot misregistration is visible on midtones (offset-print artifact, NOT digital glow). Subject is everyday and slightly absurd: a ripe persimmon balanced on a rotary phone, a stack of Polaroids on red linoleum, a single shoe on a colored tile. Pantone-032c hot red (#ef3340) and paper cream (#f4ecdd) carry the page. Subject centered; upper 25% of frame stays as plain colored backdrop for headline overlay.",
+    "Hyperreal-3D tactile photography — Gimme Gummy / Hyperreal-3D-Worlds register. Subjects: a single object photographed flat on a butter-cream seamless backdrop with one hard side light producing a short crisp shadow — a glossy gummy candy, a translucent jelly phone case, a chunky rubber duck, a soft plush keychain on a bubblegum-pink tile. Material reads tactile (glossy-soft, gel-like, rubber). Saturated candy palette: butter cream #fff5d6 backdrop with one bubblegum-pink (#ff5b9d) or electric-lime (#c8ff3c) accent on a single small surface. Subject centered with breathing space; upper 25% plain backdrop for headline tile overlay. Never CGI-glassy; the photo register is real-object-on-paper.",
   ),
 
-  // Cover — Vogue / W / Numéro fashion-cover lineage. Full-bleed photo
-  // with a serif italic title that crops into the subject.
+  // Zine — punk collage. Counterculture, irreverent, opinion.
   templateInsert(
-    "tpl_cover", "cover-feature", "Cover — Vogue / Numéro",
-    "reel-cards", "Cover", 22, "#c8a04f",
-    '["chill","cinematic","ambient"]',
-    "Fashion-cover editorial portrait or still life — Vogue / W / Numéro lineage. Single subject occupying the central upper half of the frame, full-bleed, charcoal or muted neutral surroundings. Light restrained — single softbox or window light, no studio glare, no rim-light cliché. The subject IS the cover: a person photographed at the shoulder line (face partially in shadow), or a still life arranged like a fashion editorial (a wool coat over a chair, a single ceramic vessel on linen). Tonal palette stays cool and minimal except for one warm-metal accent (burnished gold, polished brass, aged bronze) on a single small surface.",
+    "tpl_zine", "zine-default", "Zine — Counterculture Collage",
+    "reel-cards", "Zine", 21, "#ee2a32",
+    '["uplifting","viral","cinematic"]',
+    "Punk-zine photocopy register — Counterculture-Codes / Pick-and-Mix / Warning-Low-Ink. Subjects: a single subject photographed against #f4f0e6 newsprint paper or scanned from an actual photocopy: a torn ticket stub, a half-faded receipt, a stencilled wall, a tape-marked cardboard, a hand-drawn mark on lined paper, a knockoff-store storefront sign. High contrast, visible cyan/magenta misregistration on midtones, faint photocopy debris, paper grain. Pantone-032c risograph red (#ee2a32) and acid yellow (#e8ff2c) carry the page; black ink dominates negative space. Subject central; upper 25% plain newsprint paper for headline + ransom-note kicker overlay.",
   ),
 
-  // Index — Wallpaper* / 032c / Index magazine. Black field, oversized
-  // numeral, gridded tickers, single chartreuse accent. Frontier-tech.
+  // Kinetic — typographic maximalism. Tech, AI, data, frontier.
   templateInsert(
-    "tpl_index", "index-frontier", "Index — Wallpaper* / 032c",
-    "reel-cards", "Index032c", 20, "#cfff3c",
+    "tpl_kinetic", "kinetic-default", "Kinetic — Typographic Maximalism",
+    "reel-cards", "Kinetic", 21, "#d8ff00",
     '["epic","viral","cinematic"]',
-    "Wallpaper* / 032c / Index magazine editorial photography — industrial-design product shots or environmental architecture photography. Single subject photographed on an infinite cyc or tight-framed against a plain dark wall, single hard light source from the side producing one clean shadow, deep matte blacks dominating the negative space. Rigorously gridded: subject occupies one rectangle of the frame, the rest is empty matte black. One acid chartreuse-yellow note on a single small surface only (a label, a sticker, an LED, a packaging detail). No human portraits, no studio glamour, no neon glow.",
+    "Strict black-field industrial photography — Typographic-Maximalism / Counterculture-Codes register. Subjects: a single hard-lit subject against pure matte black, photographed at oblique angle so the shadow does most of the work — a stainless edge, a server-rack ear bracket, a printed circuit-board trace, a single key-cap, a steel cable end, a polished hinge. Deep blacks dominate; subject occupies one tight rectangle of the frame (image becomes a small inset stamp behind huge typography in the layout). One acid chartreuse-yellow note (#d8ff00) on a single surface only (an LED, a sticker, a port label). No glamour, no neon glow, no human portraits.",
+  ),
+
+  // Dossier — micrographics / blueprint. Finance, data-heavy briefings.
+  templateInsert(
+    "tpl_dossier", "dossier-default", "Dossier — Micrographics / Blueprint",
+    "reel-cards", "Dossier", 22, "#a8201a",
+    '["minimal","ambient","cinematic"]',
+    "Specimen-sheet documentary photography — Micrographics / Heritage / Hand-Crafted register. Subjects: a single object on warm cream paper #f1ead6 photographed top-down or near-top-down with a faint blueprint-grid printed beneath — a folded letter on a desk, a magnifying-glass beside printed data, a typewriter ribbon, a fountain-pen on linen, a brass compass on architectural drafting paper. Single overcast or single window light, low contrast, paper grain visible. Cream paper + ink-black + a single blueprint-cyan (#2c5e8c) note (a stamp, an ink mark, a ribbon edge) and one crimson (#a8201a) FILED stamp on a single small surface. Subject central, top half clear for italic-serif headline + corner registration ticks.",
   ),
 
   // ── 5 KR-niche default presets ─────────────────────────────────
   // These pre-bias accent + bgPromptTemplate for Korean Instagram audiences
   // in specific verticals so a topic just picks one by slug.
 
-  // 투자/금융 — Monocle 톤. 차분한 navy + coral, 데이터 중심.
+  // 투자/금융 — Dossier (data-heavy specimen).
   templateInsert(
-    "tpl_ko_finance_monocle", "ko-finance-monocle", "투자 · Monocle Brief",
-    "reel-cards", "Monocle", 22, "#d8534a",
+    "tpl_ko_finance_dossier", "ko-finance-dossier", "투자 · Dossier Brief",
+    "reel-cards", "Dossier", 22, "#a8201a",
     '["minimal","ambient","cinematic"]',
-    "Korean financial-press editorial photo — Monocle-meets-Maeil-Business aesthetic. Subjects: a Yeouido high-rise lobby at low elevation, a printed Bloomberg Terminal page with red-pen circles, a coffee mug beside an open accounting ledger, a tax stamp on cream paper, a stainless-steel handrail of a Seoul subway station at off-peak. Single overcast or fluorescent light, low contrast, navy and paper-cream palette, one coral-red note on a single surface (a stamp, a stock-ticker LED, a folder spine). Subject central; upper third plain so a 'BRIEFING / SEOUL' kicker bar can sit above.",
+    "Korean financial-specimen photography — Dossier register applied to Yeouido / 강남 finance subjects. A single object on warm cream paper with a faint blueprint grid: a printed stock-ticker page with red-pen circles, a folded Bloomberg printout beside a fountain pen, a brass paperweight on cream linen, a typed memo with a 도장 stamp, a calculator on linen-laid paper, a magnifying glass over a Maeil-Business article. Single overcast light, low contrast, paper grain visible. Crimson (#a8201a) on a single surface (a stamp, a ribbon, a circle of red ink); one blueprint-cyan note (a ledger ruling, an ink mark). Subject central, top half clear for italic serif headline + corner registration ticks.",
   ),
 
-  // AI / 기술 — Index 032c 톤. 검정 + 형광노랑.
+  // AI / 기술 — Kinetic (typographic maximalism).
   templateInsert(
-    "tpl_ko_ai_index", "ko-ai-index", "AI · Index Frontier",
-    "reel-cards", "Index032c", 20, "#cfff3c",
+    "tpl_ko_ai_kinetic", "ko-ai-kinetic", "AI · Kinetic Frontier",
+    "reel-cards", "Kinetic", 21, "#d8ff00",
     '["epic","cinematic","viral"]',
-    "Korean tech-press industrial-product photography — 032c / Wallpaper* register applied to AI/dev tooling subjects. A single subject on a matte-black surface or against a plain dark wall: a mechanical keycap, an SSD on its side, a printed circuit-board edge, a stainless-steel laptop hinge, a Korean mechanical keyboard with hangul-engraved keycaps, a lone server-rack ear bracket. One hard key light from the side, deep blacks dominating, no glamour. One acid chartreuse note on a single small surface (a status LED, a packaging sticker, a port label).",
+    "Korean tech-press industrial photography — Kinetic register applied to AI/dev tooling. A single subject on matte black or against a plain dark wall: a Korean mechanical keyboard with hangul-engraved keycaps, a stainless-steel laptop hinge edge, an SSD on its side, a single PCB trace, a server-rack ear bracket. One hard side light, deep blacks dominating. The image will become a small inset stamp behind huge type in the layout, so frame the subject tight with empty matte-black around it. One acid chartreuse note (#d8ff00) on a single small surface (a status LED, a packaging label, a port mark).",
   ),
 
-  // 트렌드 / MZ — Riso poster 톤.
+  // 트렌드 / MZ — Gummy (hyperreal 3D candy).
   templateInsert(
-    "tpl_ko_trend_riso", "ko-trend-riso", "트렌드 · Riso Poster",
-    "reel-cards", "Riso", 21, "#ef3340",
+    "tpl_ko_trend_gummy", "ko-trend-gummy", "트렌드 · Gummy Candy",
+    "reel-cards", "Gummy", 21, "#ff5b9d",
     '["uplifting","viral","epic"]',
-    "Korean MZ-trend riso-poster aesthetic — RISOTTO Studio register applied to a Korean street or domestic subject. A single subject photographed flat on a hot-red seamless: a Mexican-pepper-shaped lighter from a Hongdae convenience store, a Joseon Univ. rally pin from the 1990s, a parking ticket stuck under a wiper, a scratch-card lottery on a tile floor, a thin paper cup of soju at noon. Hard side light, faint cyan-magenta misregistration visible. Pantone-032c red carrying the largest area, paper cream margins. Subject central, upper 25% plain hot-red for headline.",
+    "Korean MZ-trend tactile photography — Gummy register applied to Korean street/domestic objects. A single subject photographed flat against a butter-cream seamless: a glossy 약과 gummy on a pink tile, a 띠부띠부씰 sticker collection on a butter-cream backdrop, a translucent 추파춥스 jelly, a chunky 새콤달콤 candy bar, a soft plush 인생네컷 photo strip on a bubblegum tile. Hard side light, faint shadow, real-object-on-paper register (no CGI glass). One bubblegum-pink (#ff5b9d) or electric-lime (#c8ff3c) note carries the page. Upper 25% plain backdrop for headline-tile overlay.",
   ),
 
-  // 에세이 / 오피니언 — Editorial 톤. 차분.
+  // 에세이 / 오피니언 — Aurora (atmospheric gradient).
   templateInsert(
-    "tpl_ko_essay_editorial", "ko-essay-editorial", "에세이 · Editorial",
-    "reel-cards", "Editorial", 21, "#a8201a",
+    "tpl_ko_essay_aurora", "ko-essay-aurora", "에세이 · Aurora",
+    "reel-cards", "Aurora", 22, "#ff6b9d",
     '["chill","minimal","cinematic"]',
-    "Korean essay-magazine documentary photography — NYT Magazine register applied to ordinary Korean domestic life. Subjects: a half-empty mug on a Yeouido windowsill at 7am with the city haze behind, a worn wooden floor with a paperback cracked open, a metal shutter door of a Sangdo-dong side-alley shop at dusk with a hand-painted '오늘 마감' sign, a pair of weathered hands wrapping a paper bag at a Mangwon-dong bakery. 35mm film feel, single window light from one direction, real surface texture (chipped paint, dog-eared paper, condensation on glass). Warm paper-cream non-image areas, muted earth tones in the photo, one brick-red accent on a single small surface only.",
+    "Korean essay-magazine atmospheric photography — Aurora register applied to ordinary Korean domestic life under cool gradient light. Subjects: a half-empty mug on a Yeouido windowsill at 7am with the city haze behind, a worn wooden floor with a paperback cracked open, a metal shutter door of a Sangdo-dong side-alley shop at dusk, a pair of weathered hands wrapping a paper bag at a Mangwon-dong bakery — but always under cool ambient gradient atmosphere (deep navy → opal lilac fog). Single soft directional light. Cool palette dominates; one cosmic-pink note (#ff6b9d) on a single small surface only.",
   ),
 
-  // 인용/명상 — Cover 톤. 시간/관조.
+  // 인용/명상 — Zine (counterculture collage applied to quiet quotes).
   templateInsert(
-    "tpl_ko_quote_cover", "ko-quote-cover", "인용 · Cover Feature",
-    "reel-cards", "Cover", 22, "#c8a04f",
+    "tpl_ko_quote_zine", "ko-quote-zine", "인용 · Zine Collage",
+    "reel-cards", "Zine", 21, "#ee2a32",
     '["chill","cinematic","minimal"]',
-    "Korean lifestyle-cover editorial portraiture — Vogue Korea / W Korea register applied to quiet contemplative subjects. A single subject occupying the central upper half: a person seen from the shoulder up at a window in shadow, a porcelain teacup beside a paperback, a wool coat draped over a vintage chair, a single calligraphy brush on raw linen, a porcelain bowl half-filled with water on a wooden tray. Charcoal or muted-neutral surroundings, single soft window light from one side, full-bleed composition. One burnished-gold note on a single surface (a brass rim, a lettering pen tip, a pendant).",
+    "Korean quote-card photocopy register — Zine applied to contemplative subjects. A single subject on newsprint paper (#f4f0e6), photographed flat or scanned: a folded letter, a paperback page with a marker line, a tape-marked envelope, a torn poetry magazine spread, a hand-drawn mark on lined paper, a calligraphy 붓 brush on hanji paper. High contrast, faint photocopy debris, slight cyan/magenta misregistration on midtones. Risograph red (#ee2a32) and acid yellow (#e8ff2c) on single small surfaces only. Subject central; upper 25% plain newsprint for ransom-note kicker stamp.",
   ),
 
   // ── Threads card (system default) ──────────────────────────────
-  // The new ThreadsCard composition uses the editorial palette by default.
+  // The new ThreadsCard composition uses the Dossier system by default.
   templateInsert(
-    "tpl_threads_editorial", "threads-editorial", "Threads · Editorial Dispatch",
+    "tpl_threads_dossier", "threads-dossier", "Threads · Dossier Dispatch",
     "threads-photo", "ThreadsCard", 0, "#a8201a",
     '[]',
-    "Korean editorial dispatch backdrop for a Threads still — NYT Magazine register, paper-cream backdrop, single muted subject in the upper photo zone (a hand on a window, a corner of a desk, a steam-rising mug at dawn), 50mm soft window light, one quiet brick accent. Leaves room for kicker + serif headline + body in the lower half. Never bake on-screen text into the image.",
+    "Korean specimen-style backdrop for a Threads still — Dossier register, warm cream paper #f1ead6 with faint blueprint grid, single muted subject in the upper specimen frame (a folded letter, a steam-rising mug at dawn, a brass compass on linen), 50mm soft window light, one crimson stamp accent on a single surface. Leaves room for italic serif headline + body in the lower half. Never bake on-screen text into the image.",
   ),
 
   // ── Video (Seedance 2.0) — keep ────────────────────────────────
   templateInsert(
     "tpl_seedance_reel", "seedance-reel", "Seedance Reel (Video)",
-    "reel-video", "SeedanceReel", 22, "#cfff3c",
+    "reel-video", "SeedanceReel", 22, "#d8ff00",
     '["uplifting","cinematic","epic"]',
     "Cinematic 35mm film feel, soft natural lighting, single clear subject, shallow depth of field, no on-screen text. The first frame is a striking still that the video model can animate naturally — an action half-frozen, not a posed end-frame. Documentary register, never glossy CGI.",
   ),

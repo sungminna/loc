@@ -3,7 +3,7 @@
 // CLI:
 //   bun src/sandbox/render-reel.ts \
 //     --run-id <runId> \
-//     --composition Editorial \
+//     --composition Aurora \
 //     --brief data/runs/<runId>/brief.json \
 //     [--audio-url <publicUrl>] \
 //     [--audio-attribution "..."] \
@@ -39,7 +39,7 @@ function parseArgs(argv: string[]): Args {
   const accentRaw = m.get("accent")?.trim();
   return {
     runId,
-    composition: m.get("composition") ?? "Editorial",
+    composition: m.get("composition") ?? "Aurora",
     briefPath: m.get("brief") ?? `data/runs/${runId}/brief.json`,
     audioUrl: m.get("audio-url"),
     audioAttribution: m.get("audio-attribution"),
@@ -120,7 +120,9 @@ async function main(args: Args): Promise<void> {
     output: coverPath,
     inputProps,
     imageFormat: "jpeg",
-    jpegQuality: 88,
+    // Cover JPG = the IG Reels thumbnail shown in the grid. Bumped from
+    // 88 → 92 so type edges stay crisp through IG's recompression.
+    jpegQuality: 92,
     frame: 12,
   });
 

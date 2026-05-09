@@ -2,10 +2,8 @@ import { bundle } from "@remotion/bundler";
 import { selectComposition } from "@remotion/renderer";
 
 const ids = [
-  "CardNews", "ThreadsCard",
-  "KineticType", "BoldEditorial", "MinimalGrid",
-  "NeoBrutalism", "GlassMorphism", "RetroVHS",
-  "DataStory", "QuoteSpotlight", "SeedanceReel",
+  "Aurora", "Gummy", "Zine", "Kinetic", "Dossier",
+  "SeedanceReel", "ThreadsCard",
 ];
 
 const serveUrl = await bundle({

@@ -8,9 +8,9 @@ export interface ReelSlide {
   headline: string;
   body?: string;
   emphasis?: string;
-  /** Single number or short stat highlighted by Monocle / Riso / Index032c. */
+  /** Single number or short stat highlighted by Gummy / Kinetic / Dossier. */
   stat?: { value: string; label?: string; suffix?: string };
-  /** Quote attribution for Cover. */
+  /** Quote attribution (used by templates that surface a source line). */
   attribution?: string;
   /** Background image URL — typically gpt-image-2 output uploaded to R2. */
   bgImageUrl?: string;

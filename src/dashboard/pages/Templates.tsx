@@ -30,7 +30,7 @@ const EMPTY: TemplateForm = {
   name: "",
   kind: "reel-cards",
   platform: "instagram",
-  compositionId: "Editorial",
+  compositionId: "Aurora",
   schema: {},
   defaults: {},
   defaultAudioMood: [],
@@ -137,7 +137,7 @@ function TemplateEditor({ form, setForm }: { form: TemplateForm; setForm: (f: Te
             onChange={(e) => {
               const platform = e.target.value as TemplateForm["platform"];
               const kind: TemplateForm["kind"] = platform === "threads" ? "threads-photo" : (form.kind === "threads-photo" ? "reel-cards" : form.kind);
-              const compositionId = platform === "threads" ? "ThreadsCard" : (form.compositionId === "ThreadsCard" ? "Editorial" : form.compositionId);
+              const compositionId = platform === "threads" ? "ThreadsCard" : (form.compositionId === "ThreadsCard" ? "Aurora" : form.compositionId);
               setForm({ ...form, platform, kind, compositionId });
             }}>
             <option value="instagram">Instagram (Reels)</option>
@@ -149,10 +149,10 @@ function TemplateEditor({ form, setForm }: { form: TemplateForm; setForm: (f: Te
             const kind = e.target.value as TemplateForm["kind"];
             // Auto-suggest a composition for the selected kind when the
             // current value clearly belongs to the other family.
-            const slideComps = ["Editorial", "Monocle", "Riso", "Cover", "Index032c"];
+            const slideComps = ["Aurora", "Gummy", "Zine", "Kinetic", "Dossier"];
             let compositionId = form.compositionId;
             if (kind === "reel-video" && slideComps.includes(compositionId)) compositionId = "SeedanceReel";
-            else if ((kind === "reel-cards" || kind === "reel-animated") && compositionId === "SeedanceReel") compositionId = "Editorial";
+            else if ((kind === "reel-cards" || kind === "reel-animated") && compositionId === "SeedanceReel") compositionId = "Aurora";
             setForm({ ...form, kind, compositionId });
           }}>
             {form.platform === "threads" ? (
@@ -166,7 +166,7 @@ function TemplateEditor({ form, setForm }: { form: TemplateForm; setForm: (f: Te
             )}
           </select>
         </Field>
-        <Field label="Composition ID" hint="src/remotion/Root.tsx에 등록된 id. 카드: Editorial (NYT Mag) / Monocle (briefing) / Riso (hot poster) / Cover (Vogue) / Index032c (Wallpaper*). 영상: SeedanceReel.">
+        <Field label="Composition ID" hint="src/remotion/Root.tsx에 등록된 id. 카드: Aurora (atmospheric gradient) / Gummy (3D candy tile) / Zine (punk collage) / Kinetic (typographic morph) / Dossier (blueprint). 영상: SeedanceReel.">
           <input className="input font-mono text-xs" value={form.compositionId} onChange={(e) => setForm({ ...form, compositionId: e.target.value })} />
         </Field>
         <Field label="길이 (초)">

@@ -1,6 +1,6 @@
 // LivePlayer — thin wrapper around @remotion/player <Player>.
 //
-//   <LivePlayer compositionId="Monocle" inputProps={{ slides: [...] }} />
+//   <LivePlayer compositionId="Aurora" inputProps={{ slides: [...] }} />
 //
 // Sizing: the Player scales to fit its container's width while preserving
 // the composition's native aspect ratio. Audio/Video tracks autoplay muted

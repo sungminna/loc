@@ -1,9 +1,9 @@
 import { Composition, registerRoot } from "remotion";
-import { Editorial, defaultEditorialProps } from "./compositions/Editorial";
-import { Monocle, defaultMonocleProps } from "./compositions/Monocle";
-import { Riso, defaultRisoProps } from "./compositions/Riso";
-import { Cover, defaultCoverProps } from "./compositions/Cover";
-import { Index032c, defaultIndex032cProps } from "./compositions/Index032c";
+import { Aurora, defaultAuroraProps } from "./compositions/Aurora";
+import { Gummy, defaultGummyProps } from "./compositions/Gummy";
+import { Zine, defaultZineProps } from "./compositions/Zine";
+import { Kinetic, defaultKineticProps } from "./compositions/Kinetic";
+import { Dossier, defaultDossierProps } from "./compositions/Dossier";
 import { ThreadsCard, defaultThreadsCardProps } from "./compositions/ThreadsCard";
 import { SeedanceReel, defaultSeedanceReelProps } from "./compositions/SeedanceReel";
 import type { CardSlideProps, VideoReelProps } from "./types";
@@ -14,19 +14,19 @@ const FPS = 30;
 // TS types instead, so erase the schema-bound prop type with a cast.
 type AnyComp = React.ComponentType<Record<string, unknown>>;
 
-// Per-template slide duration (frames). The deck "magazine read" pacing
-// matters: editorial spreads sit longer (you read body), Index snaps
-// faster (ticker rhythm), Cover holds longest (one quote per slide).
-const SLIDE_FRAMES_BY_COMP: Record<string, number> = {
-  Editorial: 156,
-  Monocle: 162,
-  Riso: 156,
-  Cover: 168,
-  Index032c: 150,
+// Per-template slide duration (frames). Each template's pacing matches
+// its visual register: Aurora's ambient fields hold longer, Gummy's
+// tactile bounces snap quicker, Kinetic's type-fill needs time to morph.
+export const SLIDE_FRAMES_BY_COMP: Record<string, number> = {
+  Aurora: 168,
+  Gummy: 156,
+  Zine: 156,
+  Kinetic: 156,
+  Dossier: 162,
 };
 
 function cardMetadata(compositionId: string) {
-  const slideFrames = SLIDE_FRAMES_BY_COMP[compositionId] ?? 150;
+  const slideFrames = SLIDE_FRAMES_BY_COMP[compositionId] ?? 156;
   return ({ props }: { props: unknown }) => {
     const slides = (props as CardSlideProps).slides ?? [];
     return { durationInFrames: Math.max(FPS * 6, slideFrames * Math.max(1, slides.length) + 12) };
@@ -42,44 +42,44 @@ function videoMetadata({ props }: { props: unknown }) {
 function RemotionRoot() {
   return (
     <>
-      {/* Editorial — NYT Magazine / The New Yorker / Cereal lineage. */}
+      {/* Aurora — Atmospheric Gradients (Cool Blue / Drama Club). */}
       <Composition
-        id="Editorial" component={Editorial as unknown as AnyComp}
+        id="Aurora" component={Aurora as unknown as AnyComp}
         width={1080} height={1920} fps={FPS} durationInFrames={FPS * 24}
-        defaultProps={defaultEditorialProps as unknown as Record<string, unknown>}
-        calculateMetadata={cardMetadata("Editorial")}
+        defaultProps={defaultAuroraProps as unknown as Record<string, unknown>}
+        calculateMetadata={cardMetadata("Aurora")}
       />
 
-      {/* Monocle — Monocle / Bloomberg Businessweek / FT Weekend. */}
+      {/* Gummy — Hyperreal 3D / Tactile / Gimme Gummy. */}
       <Composition
-        id="Monocle" component={Monocle as unknown as AnyComp}
+        id="Gummy" component={Gummy as unknown as AnyComp}
         width={1080} height={1920} fps={FPS} durationInFrames={FPS * 24}
-        defaultProps={defaultMonocleProps as unknown as Record<string, unknown>}
-        calculateMetadata={cardMetadata("Monocle")}
+        defaultProps={defaultGummyProps as unknown as Record<string, unknown>}
+        calculateMetadata={cardMetadata("Gummy")}
       />
 
-      {/* Riso — RISOTTO Studio / Print magazine / Bloomberg-collage. */}
+      {/* Zine — Counterculture / Punk / Pick-and-Mix. */}
       <Composition
-        id="Riso" component={Riso as unknown as AnyComp}
+        id="Zine" component={Zine as unknown as AnyComp}
         width={1080} height={1920} fps={FPS} durationInFrames={FPS * 24}
-        defaultProps={defaultRisoProps as unknown as Record<string, unknown>}
-        calculateMetadata={cardMetadata("Riso")}
+        defaultProps={defaultZineProps as unknown as Record<string, unknown>}
+        calculateMetadata={cardMetadata("Zine")}
       />
 
-      {/* Cover — Vogue / W / Numéro fashion-cover lineage. */}
+      {/* Kinetic — Typographic Maximalism / Variable Weight Morph. */}
       <Composition
-        id="Cover" component={Cover as unknown as AnyComp}
+        id="Kinetic" component={Kinetic as unknown as AnyComp}
         width={1080} height={1920} fps={FPS} durationInFrames={FPS * 24}
-        defaultProps={defaultCoverProps as unknown as Record<string, unknown>}
-        calculateMetadata={cardMetadata("Cover")}
+        defaultProps={defaultKineticProps as unknown as Record<string, unknown>}
+        calculateMetadata={cardMetadata("Kinetic")}
       />
 
-      {/* Index — Wallpaper* / 032c / Index magazine. */}
+      {/* Dossier — Micrographics / Heritage / Blueprint. */}
       <Composition
-        id="Index032c" component={Index032c as unknown as AnyComp}
+        id="Dossier" component={Dossier as unknown as AnyComp}
         width={1080} height={1920} fps={FPS} durationInFrames={FPS * 24}
-        defaultProps={defaultIndex032cProps as unknown as Record<string, unknown>}
-        calculateMetadata={cardMetadata("Index032c")}
+        defaultProps={defaultDossierProps as unknown as Record<string, unknown>}
+        calculateMetadata={cardMetadata("Dossier")}
       />
 
       {/* Video reel (Seedance 2.0) */}

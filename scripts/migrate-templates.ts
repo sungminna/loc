@@ -30,19 +30,24 @@ console.log(useApi ? "→ D1 API mode" : `→ wrangler subprocess mode (db=${D1_
 
 // New curated slugs (must match scripts/seed.ts).
 const NEW_SLUGS = new Set([
-  "editorial-default", "monocle-brief", "riso-poster", "cover-feature", "index-frontier",
-  "ko-finance-monocle", "ko-ai-index", "ko-trend-riso", "ko-essay-editorial", "ko-quote-cover",
-  "threads-editorial", "seedance-reel",
+  "aurora-default", "gummy-default", "zine-default", "kinetic-default", "dossier-default",
+  "ko-finance-dossier", "ko-ai-kinetic", "ko-trend-gummy", "ko-essay-aurora", "ko-quote-zine",
+  "threads-dossier", "seedance-reel",
 ]);
 
 // Old slugs to disable. Anything in the templates table whose user_id IS
 // NULL and whose slug is NOT in NEW_SLUGS gets enabled=0.
 const OLD_SLUG_HINT = [
+  // Pre-2026 redesign slugs (Editorial / Monocle / Riso / Cover / Index032c).
+  "editorial-default", "monocle-brief", "riso-poster", "cover-feature", "index-frontier",
+  "ko-finance-monocle", "ko-ai-index", "ko-trend-riso", "ko-essay-editorial", "ko-quote-cover",
+  "threads-editorial",
+  // Even older legacy slugs from before the magazine-grade redesign.
   "card-news-default", "threads-card-default",
   "kinetic-type", "bold-editorial", "minimal-grid", "neo-brutalism",
   "glass-morphism", "retro-vhs", "data-story", "quote-spotlight",
   "ko-finance-data", "ko-finance-minimal", "ko-finance-quote",
-  "ko-ai-glass", "ko-ai-kinetic",
+  "ko-ai-glass",
   "ko-news-brutal", "ko-trend-card",
   "ko-threads-news",
   "ko-listicle-top5", "ko-hot-take", "ko-before-after", "ko-authority-quote",
@@ -54,27 +59,27 @@ const OLD_SLUG_HINT = [
 const REMAP_RULES: { pattern: RegExp; newSlug: string }[] = [
   {
     pattern: /(투자|금융|증권|주식|코스피|코스닥|환율|채권|연준|fed|재테크|finance|stock|trading|inflation|인플레이션|부동산)/i,
-    newSlug: "ko-finance-monocle",
+    newSlug: "ko-finance-dossier",
   },
   {
     pattern: /(ai|인공지능|gpt|claude|모델|llm|prompt|프롬프트|cursor|개발자|coding|코딩|engineering|엔지니어|tech|frontier)/i,
-    newSlug: "ko-ai-index",
+    newSlug: "ko-ai-kinetic",
   },
   {
     pattern: /(인용|quote|어록|명상|meditation|reflection|aphorism|essay\s*quote|책)/i,
-    newSlug: "ko-quote-cover",
+    newSlug: "ko-quote-zine",
   },
   {
     pattern: /(에세이|essay|일기|개인적|opinion|오피니언|회고|reflective)/i,
-    newSlug: "ko-essay-editorial",
+    newSlug: "ko-essay-aurora",
   },
   {
     pattern: /(트렌드|trend|mz|z세대|뉴스|news|breaking|속보|핫한|화제|밈|meme|viral)/i,
-    newSlug: "ko-trend-riso",
+    newSlug: "ko-trend-gummy",
   },
 ];
 
-const DEFAULT_NEW_SLUG = "editorial-default";
+const DEFAULT_NEW_SLUG = "aurora-default";
 
 interface TopicRow {
   id: string;
